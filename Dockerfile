@@ -31,11 +31,11 @@ FROM oven/bun:1-slim AS production
 
 WORKDIR /app
 
-# Install only production dependencies
-COPY package.json bun.lock ./
+# Install only production dependencies (without lockfile to avoid mismatch)
+COPY package.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/backend/package.json ./packages/backend/
-RUN bun install --production --no-save
+RUN bun install --production
 
 # Copy built files
 COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
