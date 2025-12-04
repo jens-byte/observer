@@ -1,0 +1,25 @@
+{
+  "name": "@observer/backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@observer/shared": "workspace:*",
+    "hono": "^4.6.12",
+    "drizzle-orm": "^0.38.2",
+    "@node-rs/argon2": "^2.0.2",
+    "nodemailer": "^6.9.16",
+    "playwright": "^1.49.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "@types/nodemailer": "^6.4.17",
+    "drizzle-kit": "^0.30.1"
+  }
+}

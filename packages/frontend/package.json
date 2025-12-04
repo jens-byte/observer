@@ -1,0 +1,22 @@
+{
+  "name": "@observer/frontend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@observer/shared": "workspace:*",
+    "@solidjs/router": "^0.15.1",
+    "solid-js": "^1.9.3",
+    "uplot": "^1.6.32"
+  },
+  "devDependencies": {
+    "vite": "^6.0.3",
+    "vite-plugin-solid": "^2.10.2",
+    "@tailwindcss/vite": "^4.0.0-beta.8",
+    "tailwindcss": "^4.0.0-beta.8"
+  }
+}

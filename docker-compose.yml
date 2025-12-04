@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  observer:
+    build: .
+    container_name: observer
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - observer_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_PATH=/app/data/observer.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  observer_data:
