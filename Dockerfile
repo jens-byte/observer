@@ -10,7 +10,7 @@ COPY packages/backend/package.json ./packages/backend/
 COPY packages/frontend/package.json ./packages/frontend/
 
 # Install dependencies
-RUN bun install --no-save
+RUN bun install
 
 # Copy source files
 COPY tsconfig.json biome.json ./
@@ -18,29 +18,21 @@ COPY packages/shared ./packages/shared
 COPY packages/backend ./packages/backend
 COPY packages/frontend ./packages/frontend
 
-# Build frontend
+# Build frontend only
 WORKDIR /app/packages/frontend
 RUN bun run build
 
-# Build backend (exclude playwright from bundle - it has native deps)
-WORKDIR /app/packages/backend
-RUN bun build --target=bun src/index.ts --outdir=dist --external playwright --external playwright-core --external better-sqlite3
-
-# Production stage
-FROM oven/bun:1-slim AS production
+# Production stage - use full bun image for native modules
+FROM oven/bun:1 AS production
 
 WORKDIR /app
 
-# Install dependencies (need native modules like better-sqlite3)
-COPY package.json bun.lock ./
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/backend/package.json ./packages/backend/
-RUN bun install
-
-# Copy built files
-COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
-COPY --from=builder /app/packages/frontend/dist ./packages/backend/public
+# Copy everything from builder (including node_modules)
+COPY --from=builder /app/package.json /app/bun.lock ./
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared ./packages/shared
+COPY --from=builder /app/packages/backend ./packages/backend
+COPY --from=builder /app/packages/frontend/dist ./packages/backend/public
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data
@@ -58,4 +50,5 @@ WORKDIR /app/packages/backend
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3001/health || exit 1
 
-CMD ["bun", "run", "dist/index.js"]
+# Run source directly instead of bundled
+CMD ["bun", "run", "src/index.ts"]
