@@ -24,18 +24,18 @@ RUN bun run build
 
 # Build backend (exclude playwright from bundle - it has native deps)
 WORKDIR /app/packages/backend
-RUN bun build --target=bun src/index.ts --outdir=dist --external playwright --external playwright-core
+RUN bun build --target=bun src/index.ts --outdir=dist --external playwright --external playwright-core --external better-sqlite3
 
 # Production stage
 FROM oven/bun:1-slim AS production
 
 WORKDIR /app
 
-# Install only production dependencies (without lockfile to avoid mismatch)
-COPY package.json ./
+# Install dependencies (need native modules like better-sqlite3)
+COPY package.json bun.lock ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/backend/package.json ./packages/backend/
-RUN bun install --production
+RUN bun install
 
 # Copy built files
 COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
