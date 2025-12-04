@@ -23,7 +23,12 @@ jobs:
             git fetch origin
             git reset --hard origin/main
 
-            docker compose down || true
+            # Stop any existing containers and processes on port 3001
+            docker compose down --remove-orphans || true
+            docker stop observer 2>/dev/null || true
+            docker rm observer 2>/dev/null || true
+            fuser -k 3001/tcp 2>/dev/null || true
+
             docker compose up --build -d
 
             echo "Deployed successfully at $(date)"
