@@ -17,9 +17,20 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /var/www/observer || git clone https://github.com/jens-byte/observer.git /var/www/observer
+            set -e
+
+            # Check if it's a git repo, if not, backup and clone fresh
+            if [ ! -d "/var/www/observer/.git" ]; then
+              echo "Not a git repo, setting up fresh..."
+              [ -d "/var/www/observer" ] && mv /var/www/observer /var/www/observer.backup.$(date +%s)
+              git clone https://github.com/jens-byte/observer.git /var/www/observer
+            fi
+
             cd /var/www/observer
-            git pull origin main
-            docker-compose down
-            docker-compose up --build -d
+            git fetch origin
+            git reset --hard origin/main
+
+            docker compose down || true
+            docker compose up --build -d
+
             echo "Deployed successfully at $(date)"
