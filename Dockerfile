@@ -50,5 +50,5 @@ WORKDIR /app/packages/backend
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3001/health || exit 1
 
-# Run source directly instead of bundled
-CMD ["bun", "run", "src/index.ts"]
+# Run migrations and then start server
+CMD bun run src/db/migrate.ts && bun run src/index.ts
