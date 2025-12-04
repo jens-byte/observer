@@ -636,12 +636,24 @@ export default function SettingsModal(props: SettingsModalProps) {
                                 Will join as <span class={`rounded px-1 py-0.5 ${getRoleBadge(invite.role)}`}>{invite.role}</span>
                               </div>
                             </div>
-                            <button
-                              onClick={() => handleCancelInvite(invite.id)}
-                              class="text-xs text-[var(--text-tertiary)] hover:text-red-400"
-                            >
-                              Cancel
-                            </button>
+                            <div class="flex items-center gap-3">
+                              <button
+                                onClick={() => {
+                                  const url = `${window.location.origin}/invite/${invite.token}`
+                                  navigator.clipboard.writeText(url)
+                                  setSuccess('Invite link copied!')
+                                }}
+                                class="text-xs text-[var(--accent)] hover:underline"
+                              >
+                                Copy link
+                              </button>
+                              <button
+                                onClick={() => handleCancelInvite(invite.id)}
+                                class="text-xs text-[var(--text-tertiary)] hover:text-red-400"
+                              >
+                                Cancel
+                              </button>
+                            </div>
                           </div>
                         )}
                       </For>
