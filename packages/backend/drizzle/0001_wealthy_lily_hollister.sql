@@ -1,0 +1,1 @@
+ALTER TABLE `settings` ADD `screenshots_enabled` integer DEFAULT true NOT NULL;

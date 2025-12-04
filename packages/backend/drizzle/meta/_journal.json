@@ -8,6 +8,13 @@
       "when": 1764784782779,
       "tag": "0000_bumpy_rogue",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1764835087423,
+      "tag": "0001_wealthy_lily_hollister",
+      "breakpoints": true
     }
   ]
 }

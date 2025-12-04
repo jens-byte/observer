@@ -53,12 +53,14 @@ settings.put('/', requireWorkspace('editor'), async (c: any) => {
   if (data.emailSmtpPort !== undefined) updates.emailSmtpPort = data.emailSmtpPort
   if (data.emailSmtpUser !== undefined) updates.emailSmtpUser = data.emailSmtpUser
   if (data.emailSmtpPass !== undefined) updates.emailSmtpPass = data.emailSmtpPass
+  if (data.slackEnabled !== undefined) updates.slackEnabled = data.slackEnabled
   if (data.webhookEnabled !== undefined) updates.webhookEnabled = data.webhookEnabled
   if (data.webhookUrl !== undefined) updates.webhookUrl = data.webhookUrl
   if (data.webhookDelaySeconds !== undefined) updates.webhookDelaySeconds = data.webhookDelaySeconds
   if (data.sslWarningDays !== undefined) updates.sslWarningDays = data.sslWarningDays
   if (data.slackBotToken !== undefined) updates.slackBotToken = data.slackBotToken
   if (data.slackChannelId !== undefined) updates.slackChannelId = data.slackChannelId
+  if (data.screenshotsEnabled !== undefined) updates.screenshotsEnabled = data.screenshotsEnabled
 
   if (Object.keys(updates).length > 0) {
     db.update(schema.settings).set(updates).where(eq(schema.settings.workspaceId, workspaceId)).run()
@@ -104,12 +106,14 @@ function formatSettings(s: typeof schema.settings.$inferSelect): Settings {
     emailSmtpPort: s.emailSmtpPort,
     emailSmtpUser: s.emailSmtpUser,
     emailSmtpPass: s.emailSmtpPass,
+    slackEnabled: s.slackEnabled,
     webhookEnabled: s.webhookEnabled,
     webhookUrl: s.webhookUrl,
     webhookDelaySeconds: s.webhookDelaySeconds,
     sslWarningDays: s.sslWarningDays,
     slackBotToken: s.slackBotToken,
     slackChannelId: s.slackChannelId,
+    screenshotsEnabled: s.screenshotsEnabled,
   }
 }
 

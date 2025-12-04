@@ -280,21 +280,25 @@ export async function sendNotification(
 
   const results: string[] = []
 
-  // Send webhook/Slack notification
-  if (settings.webhookEnabled && settings.webhookUrl) {
-    const success = await sendSlackWebhook(settings.webhookUrl, payload)
-    results.push(`Webhook: ${success ? 'sent' : 'failed'}`)
-  }
-
-  // Send Slack Bot message with screenshot
-  if (settings.slackBotToken && settings.slackChannelId) {
-    const success = await sendSlackBotMessage(
-      settings.slackBotToken,
-      settings.slackChannelId,
-      payload,
-      screenshotBuffer
-    )
-    results.push(`Slack Bot: ${success ? 'sent' : 'failed'}`)
+  // Only send Slack notifications if slackEnabled is true
+  if (settings.slackEnabled) {
+    // If Slack Bot is configured, always use it (supports screenshots)
+    // Only fall back to webhook if bot isn't configured
+    if (settings.slackBotToken && settings.slackChannelId) {
+      // Use screenshot only if screenshotsEnabled is true
+      const screenshot = settings.screenshotsEnabled ? screenshotBuffer : undefined
+      const success = await sendSlackBotMessage(
+        settings.slackBotToken,
+        settings.slackChannelId,
+        payload,
+        screenshot
+      )
+      results.push(`Slack Bot: ${success ? 'sent' : 'failed'}`)
+    } else if (settings.webhookEnabled && settings.webhookUrl) {
+      // Fallback to webhook only if bot isn't configured
+      const success = await sendSlackWebhook(settings.webhookUrl, payload)
+      results.push(`Webhook: ${success ? 'sent' : 'failed'}`)
+    }
   }
 
   // Send email notification

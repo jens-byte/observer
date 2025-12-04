@@ -215,12 +215,12 @@ export default function Dashboard() {
         title={`${props.site.url}${props.site.lastResponseTime ? ' • ' + props.site.lastResponseTime + 'ms' : ''}`}
       >
         <div class="relative flex-shrink-0">
-          <div class={`h-1.5 w-1.5 rounded-full ${getStatusColor()}`} />
+          <div class={`h-2 w-2 rounded-full ${getStatusColor()}`} />
           <Show when={isAlert}>
-            <div class={`absolute inset-0 h-1.5 w-1.5 rounded-full ${getStatusColor()} animate-ping opacity-75`} />
+            <div class={`absolute inset-0 h-2 w-2 rounded-full ${getStatusColor()} animate-ping opacity-75`} />
           </Show>
         </div>
-        <span class="text-[11px] text-[var(--text-secondary)] truncate">{props.site.name}</span>
+        <span class="text-xs text-[var(--text-secondary)] truncate">{props.site.name}</span>
       </div>
     )
   }
@@ -318,60 +318,48 @@ export default function Dashboard() {
             onClick={() => setFilter('up')}
             class={`group rounded-xl border p-4 text-left transition-all ${
               filter() === 'up'
-                ? 'border-[#10a37f]/50 bg-[#10a37f]/10'
+                ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="flex items-center gap-2">
-              <div class="h-2 w-2 rounded-full bg-[#10a37f]" />
-              <span class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Up</span>
-            </div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-[#10a37f]">{stats().up}</div>
+            <div class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Up</div>
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().up}</div>
           </button>
 
           <button
             onClick={() => setFilter('slow')}
             class={`group rounded-xl border p-4 text-left transition-all ${
               filter() === 'slow'
-                ? 'border-amber-500/50 bg-amber-500/10'
+                ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="flex items-center gap-2">
-              <div class="h-2 w-2 rounded-full bg-amber-500" />
-              <span class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Slow</span>
-            </div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-amber-500">{stats().slow}</div>
+            <div class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Slow</div>
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().slow}</div>
           </button>
 
           <button
             onClick={() => setFilter('down')}
             class={`group rounded-xl border p-4 text-left transition-all ${
               filter() === 'down'
-                ? 'border-red-500/50 bg-red-500/10'
+                ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="flex items-center gap-2">
-              <div class="h-2 w-2 rounded-full bg-red-500" />
-              <span class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Down</span>
-            </div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-red-500">{stats().down}</div>
+            <div class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Down</div>
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().down}</div>
           </button>
 
           <button
             onClick={() => setFilter('ssl')}
             class={`group rounded-xl border p-4 text-left transition-all ${
               filter() === 'ssl'
-                ? 'border-blue-500/50 bg-blue-500/10'
+                ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="flex items-center gap-2">
-              <div class="h-2 w-2 rounded-full bg-blue-500" />
-              <span class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">SSL</span>
-            </div>
-            <div class={`mt-1 text-2xl font-semibold tabular-nums ${stats().sslWarnings > 0 ? 'text-orange-500' : 'text-blue-500'}`}>{stats().sslWarnings}</div>
+            <div class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">SSL</div>
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().sslWarnings}</div>
           </button>
         </div>
 

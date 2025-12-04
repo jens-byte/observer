@@ -72,12 +72,14 @@ export const updateSettingsSchema = z.object({
   emailSmtpPort: z.number().int().min(1).max(65535).optional(),
   emailSmtpUser: z.string().max(200).nullable().optional(),
   emailSmtpPass: z.string().max(200).nullable().optional(),
+  slackEnabled: z.boolean().optional(),
   webhookEnabled: z.boolean().optional(),
   webhookUrl: z.string().url().nullable().optional(),
   webhookDelaySeconds: z.number().int().min(0).max(3600).optional(),
   sslWarningDays: z.number().int().min(1).max(90).optional(),
   slackBotToken: z.string().max(200).nullable().optional(),
   slackChannelId: z.string().max(50).nullable().optional(),
+  screenshotsEnabled: z.boolean().optional(),
 })
 
 // Bulk import schema

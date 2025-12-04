@@ -110,12 +110,14 @@ export interface Settings {
   emailSmtpPort: number
   emailSmtpUser: string | null
   emailSmtpPass: string | null
+  slackEnabled: boolean
   webhookEnabled: boolean
   webhookUrl: string | null
   webhookDelaySeconds: number
   sslWarningDays: number
   slackBotToken: string | null
   slackChannelId: string | null
+  screenshotsEnabled: boolean
 }
 
 // SSL Info

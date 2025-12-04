@@ -97,6 +97,11 @@ body {
   border-color: var(--border);
 }
 
+/* Clickable elements */
+button, a, [role="button"], label.cursor-pointer, .cursor-pointer {
+  cursor: pointer;
+}
+
 /* Button base */
 .btn {
   display: inline-flex;
@@ -110,6 +115,7 @@ body {
   background-color: transparent;
   color: var(--text);
   transition: all 150ms ease;
+  cursor: pointer;
 }
 
 .btn:hover {

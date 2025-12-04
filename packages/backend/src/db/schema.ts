@@ -129,12 +129,14 @@ export const settings = sqliteTable('settings', {
   emailSmtpPort: integer('email_smtp_port').notNull().default(587),
   emailSmtpUser: text('email_smtp_user'),
   emailSmtpPass: text('email_smtp_pass'),
+  slackEnabled: integer('slack_enabled', { mode: 'boolean' }).notNull().default(false),
   webhookEnabled: integer('webhook_enabled', { mode: 'boolean' }).notNull().default(false),
   webhookUrl: text('webhook_url'),
   webhookDelaySeconds: integer('webhook_delay_seconds').notNull().default(0),
   sslWarningDays: integer('ssl_warning_days').notNull().default(14),
   slackBotToken: text('slack_bot_token'),
   slackChannelId: text('slack_channel_id'),
+  screenshotsEnabled: integer('screenshots_enabled', { mode: 'boolean' }).notNull().default(true),
 })
 
 // SSL info table

@@ -3,7 +3,7 @@ import type { WorkspaceMember, WorkspaceInvite, WorkspaceRole } from '@observer/
 import { useAuth } from '../lib/auth'
 import { settings, workspaces } from '../lib/api'
 
-type SettingsTab = 'notifications' | 'workspace'
+type SettingsTab = 'workspace' | 'notifications' | 'email'
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -13,7 +13,7 @@ interface SettingsModalProps {
 
 export default function SettingsModal(props: SettingsModalProps) {
   const auth = useAuth()
-  const [activeTab, setActiveTab] = createSignal<SettingsTab>(props.initialTab || 'notifications')
+  const [activeTab, setActiveTab] = createSignal<SettingsTab>(props.initialTab || 'workspace')
   const [isLoading, setIsLoading] = createSignal(true)
   const [isSaving, setIsSaving] = createSignal(false)
   const [error, setError] = createSignal('')
@@ -26,12 +26,14 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [emailSmtpPort, setEmailSmtpPort] = createSignal(587)
   const [emailSmtpUser, setEmailSmtpUser] = createSignal('')
   const [emailSmtpPass, setEmailSmtpPass] = createSignal('')
+  const [slackEnabled, setSlackEnabled] = createSignal(false)
   const [webhookEnabled, setWebhookEnabled] = createSignal(false)
   const [webhookUrl, setWebhookUrl] = createSignal('')
   const [webhookDelaySeconds, setWebhookDelaySeconds] = createSignal(0)
   const [sslWarningDays, setSslWarningDays] = createSignal(14)
   const [slackBotToken, setSlackBotToken] = createSignal('')
   const [slackChannelId, setSlackChannelId] = createSignal('')
+  const [screenshotsEnabled, setScreenshotsEnabled] = createSignal(true)
 
   // Workspace settings
   const [members, setMembers] = createSignal<WorkspaceMember[]>([])
@@ -62,12 +64,14 @@ export default function SettingsModal(props: SettingsModalProps) {
       setEmailSmtpPort(data.emailSmtpPort)
       setEmailSmtpUser(data.emailSmtpUser || '')
       setEmailSmtpPass(data.emailSmtpPass || '')
+      setSlackEnabled(data.slackEnabled)
       setWebhookEnabled(data.webhookEnabled)
       setWebhookUrl(data.webhookUrl || '')
       setWebhookDelaySeconds(data.webhookDelaySeconds)
       setSslWarningDays(data.sslWarningDays)
       setSlackBotToken(data.slackBotToken || '')
       setSlackChannelId(data.slackChannelId || '')
+      setScreenshotsEnabled(data.screenshotsEnabled)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -117,7 +121,7 @@ export default function SettingsModal(props: SettingsModalProps) {
     if (props.isOpen && auth.currentWorkspace) {
       setError('')
       setSuccess('')
-      if (activeTab() === 'notifications' && !isGuest()) {
+      if ((activeTab() === 'notifications' || activeTab() === 'email') && !isGuest()) {
         fetchSettings()
       } else {
         fetchWorkspaceData()
@@ -127,7 +131,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 
   createEffect(() => {
     if (props.isOpen) {
-      setActiveTab(props.initialTab || (isGuest() ? 'workspace' : 'notifications'))
+      setActiveTab(props.initialTab || 'workspace')
     }
   })
 
@@ -135,7 +139,7 @@ export default function SettingsModal(props: SettingsModalProps) {
     setActiveTab(tab)
     setError('')
     setSuccess('')
-    if (tab === 'notifications') {
+    if (tab === 'notifications' || tab === 'email') {
       fetchSettings()
     } else {
       fetchWorkspaceData()
@@ -157,12 +161,14 @@ export default function SettingsModal(props: SettingsModalProps) {
         emailSmtpPort: emailSmtpPort(),
         emailSmtpUser: emailSmtpUser() || null,
         emailSmtpPass: emailSmtpPass() || null,
+        slackEnabled: slackEnabled(),
         webhookEnabled: webhookEnabled(),
         webhookUrl: webhookUrl() || null,
         webhookDelaySeconds: webhookDelaySeconds(),
         sslWarningDays: sslWarningDays(),
         slackBotToken: slackBotToken() || null,
         slackChannelId: slackChannelId() || null,
+        screenshotsEnabled: screenshotsEnabled(),
       })
       setSuccess('Settings saved')
     } catch (err) {
@@ -277,8 +283,9 @@ export default function SettingsModal(props: SettingsModalProps) {
   }
 
   const menuItems = [
-    { id: 'notifications' as SettingsTab, label: 'Notifications', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9', hidden: isGuest() },
     { id: 'workspace' as SettingsTab, label: 'Workspace', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z', hidden: false },
+    { id: 'notifications' as SettingsTab, label: 'Notifications', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9', hidden: isGuest() },
+    { id: 'email' as SettingsTab, label: 'Email', icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', hidden: isGuest() },
   ]
 
   return (
@@ -327,9 +334,9 @@ export default function SettingsModal(props: SettingsModalProps) {
             {/* Header */}
             <div class="mb-6 flex items-center justify-between">
               <h2 class="text-xl font-semibold text-[var(--text)]">
-                {activeTab() === 'notifications' ? 'Notifications' : auth.currentWorkspace?.name}
+                {activeTab() === 'notifications' ? 'Notifications' : activeTab() === 'email' ? 'Email' : 'Workspace'}
               </h2>
-              <Show when={activeTab() === 'notifications' && canEdit()}>
+              <Show when={(activeTab() === 'notifications' || activeTab() === 'email') && canEdit()}>
                 <button
                   onClick={handleSaveNotifications}
                   disabled={isSaving()}
@@ -363,9 +370,134 @@ export default function SettingsModal(props: SettingsModalProps) {
             {/* Notifications Content */}
             <Show when={!isLoading() && activeTab() === 'notifications'}>
               <div class="space-y-8">
-                {/* Email */}
+
+                {/* Slack Notifications */}
                 <section>
                   <div class="mb-4 flex items-center justify-between">
+                    <div>
+                      <h3 class="text-sm font-medium text-[var(--text)]">Slack Notifications</h3>
+                      <p class="text-xs text-[var(--text-tertiary)]">Send alerts to Slack</p>
+                    </div>
+                    <label class="relative inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        checked={slackEnabled()}
+                        onChange={(e) => setSlackEnabled(e.currentTarget.checked)}
+                        disabled={!canEdit()}
+                        class="peer sr-only"
+                      />
+                      <div class="h-6 w-11 rounded-full bg-[var(--bg-tertiary)] peer-checked:bg-[var(--accent)] peer-disabled:opacity-50 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
+                    </label>
+                  </div>
+
+                  <Show when={slackEnabled()}>
+                    <div class="space-y-6 pl-4 border-l-2 border-[var(--border)]">
+                      {/* Slack Bot */}
+                      <div>
+                        <div class="mb-3">
+                          <h4 class="text-sm font-medium text-[var(--text)]">Slack Bot</h4>
+                          <p class="text-xs text-[var(--text-tertiary)]">Send alerts with screenshots via Slack Bot API</p>
+                        </div>
+
+                        <div class="space-y-3">
+                          <input
+                            type="password"
+                            value={slackBotToken()}
+                            onInput={(e) => setSlackBotToken(e.currentTarget.value)}
+                            disabled={!canEdit()}
+                            class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                            placeholder="Bot Token (xoxb-...)"
+                          />
+                          <input
+                            type="text"
+                            value={slackChannelId()}
+                            onInput={(e) => setSlackChannelId(e.currentTarget.value)}
+                            disabled={!canEdit()}
+                            class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                            placeholder="Channel ID (C0123456789)"
+                          />
+                          <div class="flex items-center justify-between pt-1">
+                            <div>
+                              <span class="text-sm text-[var(--text)]">Screenshots</span>
+                              <p class="text-xs text-[var(--text-tertiary)]">Include screenshots in alerts</p>
+                            </div>
+                            <label class="relative inline-flex cursor-pointer items-center">
+                              <input
+                                type="checkbox"
+                                checked={screenshotsEnabled()}
+                                onChange={(e) => setScreenshotsEnabled(e.currentTarget.checked)}
+                                disabled={!canEdit()}
+                                class="peer sr-only"
+                              />
+                              <div class="h-6 w-11 rounded-full bg-[var(--bg-tertiary)] peer-checked:bg-[var(--accent)] peer-disabled:opacity-50 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="border-t border-[var(--border-subtle)]" />
+
+                      {/* Webhook Fallback */}
+                      <div>
+                        <div class="mb-3 flex items-center justify-between">
+                          <div>
+                            <h4 class="text-sm font-medium text-[var(--text)]">Webhook (Fallback)</h4>
+                            <p class="text-xs text-[var(--text-tertiary)]">Used only if Slack Bot is not configured</p>
+                          </div>
+                          <label class="relative inline-flex cursor-pointer items-center">
+                            <input
+                              type="checkbox"
+                              checked={webhookEnabled()}
+                              onChange={(e) => setWebhookEnabled(e.currentTarget.checked)}
+                              disabled={!canEdit()}
+                              class="peer sr-only"
+                            />
+                            <div class="h-6 w-11 rounded-full bg-[var(--bg-tertiary)] peer-checked:bg-[var(--accent)] peer-disabled:opacity-50 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
+                          </label>
+                        </div>
+
+                        <Show when={webhookEnabled()}>
+                          <div class="space-y-3">
+                            <input
+                              type="url"
+                              value={webhookUrl()}
+                              onInput={(e) => setWebhookUrl(e.currentTarget.value)}
+                              disabled={!canEdit()}
+                              class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                              placeholder="Webhook URL"
+                            />
+                            <div class="flex items-center gap-3">
+                              <input
+                                type="number"
+                                value={webhookDelaySeconds()}
+                                onInput={(e) => setWebhookDelaySeconds(parseInt(e.currentTarget.value) || 0)}
+                                disabled={!canEdit()}
+                                class="w-24 rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                                min="0"
+                              />
+                              <span class="text-xs text-[var(--text-tertiary)]">seconds delay before notification</span>
+                            </div>
+                            <Show when={canEdit()}>
+                              <button
+                                type="button"
+                                onClick={handleTestWebhook}
+                                class="text-xs text-[var(--accent)] hover:underline"
+                              >
+                                Send test webhook
+                              </button>
+                            </Show>
+                          </div>
+                        </Show>
+                      </div>
+                    </div>
+                  </Show>
+                </section>
+
+                <div class="border-t border-[var(--border)]" />
+
+                {/* Email Notifications */}
+                <section>
+                  <div class="flex items-center justify-between">
                     <div>
                       <h3 class="text-sm font-medium text-[var(--text)]">Email Notifications</h3>
                       <p class="text-xs text-[var(--text-tertiary)]">Receive alerts via email</p>
@@ -381,137 +513,17 @@ export default function SettingsModal(props: SettingsModalProps) {
                       <div class="h-6 w-11 rounded-full bg-[var(--bg-tertiary)] peer-checked:bg-[var(--accent)] peer-disabled:opacity-50 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
                     </label>
                   </div>
-
-                  <Show when={emailEnabled()}>
-                    <div class="space-y-3">
-                      <input
-                        type="email"
-                        value={emailTo()}
-                        onInput={(e) => setEmailTo(e.currentTarget.value)}
-                        disabled={!canEdit()}
-                        class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
-                        placeholder="Send to email"
-                      />
-                      <div class="grid grid-cols-2 gap-3">
-                        <input
-                          type="text"
-                          value={emailSmtpHost()}
-                          onInput={(e) => setEmailSmtpHost(e.currentTarget.value)}
-                          disabled={!canEdit()}
-                          class="rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
-                          placeholder="SMTP Host"
-                        />
-                        <input
-                          type="number"
-                          value={emailSmtpPort()}
-                          onInput={(e) => setEmailSmtpPort(parseInt(e.currentTarget.value) || 587)}
-                          disabled={!canEdit()}
-                          class="rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
-                          placeholder="Port"
-                        />
-                      </div>
-                      <div class="grid grid-cols-2 gap-3">
-                        <input
-                          type="text"
-                          value={emailSmtpUser()}
-                          onInput={(e) => setEmailSmtpUser(e.currentTarget.value)}
-                          disabled={!canEdit()}
-                          class="rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
-                          placeholder="SMTP Username"
-                        />
-                        <input
-                          type="password"
-                          value={emailSmtpPass()}
-                          onInput={(e) => setEmailSmtpPass(e.currentTarget.value)}
-                          disabled={!canEdit()}
-                          class="rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
-                          placeholder="SMTP Password"
-                        />
-                      </div>
-                      <Show when={canEdit()}>
-                        <button
-                          type="button"
-                          onClick={handleTestEmail}
-                          class="text-xs text-[var(--accent)] hover:underline"
-                        >
-                          Send test email
-                        </button>
-                      </Show>
-                    </div>
-                  </Show>
-                </section>
-
-                <div class="border-t border-[var(--border)]" />
-
-                {/* Webhook */}
-                <section>
-                  <div class="mb-4 flex items-center justify-between">
-                    <div>
-                      <h3 class="text-sm font-medium text-[var(--text)]">Webhook / Slack</h3>
-                      <p class="text-xs text-[var(--text-tertiary)]">Send alerts to Slack or webhook</p>
-                    </div>
-                    <label class="relative inline-flex cursor-pointer items-center">
-                      <input
-                        type="checkbox"
-                        checked={webhookEnabled()}
-                        onChange={(e) => setWebhookEnabled(e.currentTarget.checked)}
-                        disabled={!canEdit()}
-                        class="peer sr-only"
-                      />
-                      <div class="h-6 w-11 rounded-full bg-[var(--bg-tertiary)] peer-checked:bg-[var(--accent)] peer-disabled:opacity-50 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
-                    </label>
-                  </div>
-
-                  <Show when={webhookEnabled()}>
-                    <div class="space-y-3">
-                      <input
-                        type="url"
-                        value={webhookUrl()}
-                        onInput={(e) => setWebhookUrl(e.currentTarget.value)}
-                        disabled={!canEdit()}
-                        class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
-                        placeholder="Webhook URL"
-                      />
-                      <div class="flex items-center gap-3">
-                        <input
-                          type="number"
-                          value={webhookDelaySeconds()}
-                          onInput={(e) => setWebhookDelaySeconds(parseInt(e.currentTarget.value) || 0)}
-                          disabled={!canEdit()}
-                          class="w-24 rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
-                          min="0"
-                        />
-                        <span class="text-xs text-[var(--text-tertiary)]">seconds delay before notification</span>
-                      </div>
-                      <div class="grid grid-cols-2 gap-3">
-                        <input
-                          type="password"
-                          value={slackBotToken()}
-                          onInput={(e) => setSlackBotToken(e.currentTarget.value)}
-                          disabled={!canEdit()}
-                          class="rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
-                          placeholder="Slack Bot Token (for screenshots)"
-                        />
-                        <input
-                          type="text"
-                          value={slackChannelId()}
-                          onInput={(e) => setSlackChannelId(e.currentTarget.value)}
-                          disabled={!canEdit()}
-                          class="rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
-                          placeholder="Channel ID"
-                        />
-                      </div>
-                      <Show when={canEdit()}>
-                        <button
-                          type="button"
-                          onClick={handleTestWebhook}
-                          class="text-xs text-[var(--accent)] hover:underline"
-                        >
-                          Send test webhook
-                        </button>
-                      </Show>
-                    </div>
-                  </Show>
+                  <p class="text-xs text-[var(--text-tertiary)] mt-3">
+                    Configure SMTP settings in the{' '}
+                    <button
+                      type="button"
+                      onClick={() => handleTabChange('email')}
+                      class="text-[var(--accent)] hover:underline"
+                    >
+                      Email
+                    </button>
+                    {' '}tab.
+                  </p>
                 </section>
 
                 <div class="border-t border-[var(--border)]" />
@@ -590,7 +602,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                       <select
                         value={inviteRole()}
                         onChange={(e) => setInviteRole(e.currentTarget.value as 'editor' | 'guest')}
-                        class="rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+                        class="appearance-none rounded-lg border border-[var(--border)] bg-transparent pl-3 pr-8 py-2 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%239ca3af%22%20d%3D%22M2%204l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[center_right_0.75rem]"
                       >
                         <Show when={isOwner()}>
                           <option value="editor">Editor</option>
@@ -703,6 +715,90 @@ export default function SettingsModal(props: SettingsModalProps) {
                     </button>
                   </section>
                 </Show>
+              </div>
+            </Show>
+
+            {/* Email Content */}
+            <Show when={!isLoading() && activeTab() === 'email'}>
+              <div class="space-y-6">
+                <section>
+                  <p class="text-sm text-[var(--text-tertiary)] mb-6">
+                    Configure SMTP settings for sending invite emails and notifications.
+                  </p>
+
+                  <div class="space-y-4">
+                    <div>
+                      <label class="block text-sm font-medium text-[var(--text)] mb-1">SMTP Host</label>
+                      <input
+                        type="text"
+                        value={emailSmtpHost()}
+                        onInput={(e) => setEmailSmtpHost(e.currentTarget.value)}
+                        disabled={!canEdit()}
+                        class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                        placeholder="smtp.example.com"
+                      />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-sm font-medium text-[var(--text)] mb-1">Port</label>
+                        <input
+                          type="number"
+                          value={emailSmtpPort()}
+                          onInput={(e) => setEmailSmtpPort(parseInt(e.currentTarget.value) || 587)}
+                          disabled={!canEdit()}
+                          class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                          placeholder="587"
+                        />
+                      </div>
+                      <div>
+                        <label class="block text-sm font-medium text-[var(--text)] mb-1">From Address</label>
+                        <input
+                          type="email"
+                          value={emailTo()}
+                          onInput={(e) => setEmailTo(e.currentTarget.value)}
+                          disabled={!canEdit()}
+                          class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                          placeholder="noreply@example.com"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="block text-sm font-medium text-[var(--text)] mb-1">Username</label>
+                      <input
+                        type="text"
+                        value={emailSmtpUser()}
+                        onInput={(e) => setEmailSmtpUser(e.currentTarget.value)}
+                        disabled={!canEdit()}
+                        class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                        placeholder="SMTP username"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="block text-sm font-medium text-[var(--text)] mb-1">Password</label>
+                      <input
+                        type="password"
+                        value={emailSmtpPass()}
+                        onInput={(e) => setEmailSmtpPass(e.currentTarget.value)}
+                        disabled={!canEdit()}
+                        class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                        placeholder="SMTP password"
+                      />
+                    </div>
+
+                    <Show when={canEdit()}>
+                      <button
+                        type="button"
+                        onClick={handleTestEmail}
+                        class="text-sm text-[var(--accent)] hover:underline"
+                      >
+                        Send test email
+                      </button>
+                    </Show>
+                  </div>
+                </section>
               </div>
             </Show>
           </div>

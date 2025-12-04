@@ -10,6 +10,7 @@ import {
 import type { WorkspaceWithRole, WorkspaceMember, WorkspaceInvite } from '@observer/shared'
 import { requireAuth, requireWorkspace, hasMinRole, type AuthContext, type WorkspaceContext } from '../middleware/auth'
 import { generateToken, generateSlug, getInviteExpiry } from '../lib/utils'
+import { sendInviteEmail } from '../services/email'
 
 const workspaces = new Hono<AuthContext>()
 
@@ -246,6 +247,18 @@ workspaces.post('/:workspaceId/invite', requireWorkspace('editor'), async (c: an
     })
     .returning()
     .get()
+
+  // Get workspace name for email
+  const workspace = db
+    .select()
+    .from(schema.workspaces)
+    .where(eq(schema.workspaces.id, workspaceId))
+    .get()
+
+  // Send invite email (don't wait, fire and forget)
+  sendInviteEmail(email, token, workspace?.name || 'Observer', user.name, workspaceId).catch(err => {
+    console.error('[Invite] Failed to send email:', err)
+  })
 
   return c.json({
     id: invite.id,
