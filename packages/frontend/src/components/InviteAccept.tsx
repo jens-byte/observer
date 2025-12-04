@@ -18,10 +18,10 @@ export default function InviteAccept() {
       await new Promise((r) => setTimeout(r, 100))
     }
 
-    // If not authenticated, redirect to login with return URL
+    // If not authenticated, redirect to login/signup with return URL
     if (!auth.isAuthenticated) {
       const returnUrl = encodeURIComponent(`/invite/${params.token}`)
-      navigate(`/login?return=${returnUrl}`)
+      navigate(`/login?return=${returnUrl}&signup=true`)
       return
     }
 

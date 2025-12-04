@@ -1,12 +1,14 @@
-import { createSignal, Show } from 'solid-js'
-import { useNavigate } from '@solidjs/router'
+import { createSignal, Show, onMount } from 'solid-js'
+import { useNavigate, useSearchParams } from '@solidjs/router'
 import { useAuth } from '../lib/auth'
 
 export default function Login() {
   const auth = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
-  const [isRegister, setIsRegister] = createSignal(false)
+  // Check if we should show signup form (from invite link)
+  const [isRegister, setIsRegister] = createSignal(searchParams.signup === 'true')
   const [email, setEmail] = createSignal('')
   const [password, setPassword] = createSignal('')
   const [name, setName] = createSignal('')
@@ -24,7 +26,9 @@ export default function Login() {
       } else {
         await auth.login(email(), password())
       }
-      navigate('/')
+      // Redirect to return URL if provided, otherwise home
+      const returnUrl = searchParams.return ? decodeURIComponent(searchParams.return) : '/'
+      navigate(returnUrl)
     } catch (err) {
       setError((err as Error).message)
     } finally {
