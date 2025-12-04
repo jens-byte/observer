@@ -36,4 +36,10 @@ jobs:
             docker compose ps
             docker compose logs --tail 50
 
+            # Check for old database files
+            echo "=== Looking for old database files ==="
+            find /var/www -name "*.db" 2>/dev/null || true
+            find /root -name "*.db" 2>/dev/null || true
+            find /opt -name "*.db" 2>/dev/null || true
+
             echo "Deployed successfully at $(date)"
