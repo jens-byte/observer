@@ -18,6 +18,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
+            export PATH=$PATH:/usr/bin:/usr/local/bin
 
             # Check if it's a git repo, if not, backup and clone fresh
             if [ ! -d "/var/www/observer/.git" ]; then
@@ -30,7 +31,7 @@ jobs:
             git fetch origin
             git reset --hard origin/main
 
-            docker compose down || true
-            docker compose up --build -d
+            /usr/bin/docker compose down || true
+            /usr/bin/docker compose up --build -d
 
             echo "Deployed successfully at $(date)"
