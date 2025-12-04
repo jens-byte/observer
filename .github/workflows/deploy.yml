@@ -31,4 +31,9 @@ jobs:
 
             docker compose up --build -d
 
+            # Wait and check container health
+            sleep 5
+            docker compose ps
+            docker compose logs --tail 50
+
             echo "Deployed successfully at $(date)"
