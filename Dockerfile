@@ -10,7 +10,7 @@ COPY packages/backend/package.json ./packages/backend/
 COPY packages/frontend/package.json ./packages/frontend/
 
 # Install dependencies
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy source files
 COPY tsconfig.json biome.json ./
@@ -35,7 +35,7 @@ WORKDIR /app
 COPY package.json bun.lock ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/backend/package.json ./packages/backend/
-RUN bun install --production --frozen-lockfile
+RUN bun install --production
 
 # Copy built files
 COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
