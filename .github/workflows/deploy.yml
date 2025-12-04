@@ -36,16 +36,4 @@ jobs:
             docker compose ps
             docker compose logs --tail 50
 
-            # Force restore old database (one-time)
-            OLD_DB="/var/www/observer.backup.1764830256/packages/backend/data/observer.db"
-            VOLUME_PATH=$(docker volume inspect observer_observer_data --format '{{.Mountpoint}}')
-            if [ -f "$OLD_DB" ]; then
-              echo "Restoring old database from backup..."
-              docker compose stop
-              cp "$OLD_DB" "$VOLUME_PATH/observer.db"
-              docker compose start
-              sleep 5
-              docker compose logs --tail 10
-            fi
-
             echo "Deployed successfully at $(date)"
