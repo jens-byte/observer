@@ -17,11 +17,13 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "=== Debugging docker location ==="
-            echo "PATH: $PATH"
-            which docker || echo "docker not in PATH"
-            ls -la /usr/bin/docker* 2>/dev/null || echo "not in /usr/bin"
-            ls -la /usr/local/bin/docker* 2>/dev/null || echo "not in /usr/local/bin"
-            ls -la /snap/bin/docker* 2>/dev/null || echo "not in /snap/bin"
-            find / -name "docker" -type f 2>/dev/null | head -5 || echo "not found anywhere"
-            echo "=== End debug ==="
+            set -e
+
+            cd /var/www/observer
+            git fetch origin
+            git reset --hard origin/main
+
+            docker compose down || true
+            docker compose up --build -d
+
+            echo "Deployed successfully at $(date)"
