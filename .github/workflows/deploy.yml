@@ -36,4 +36,9 @@ jobs:
             docker compose ps
             docker compose logs --tail 50
 
+            # Debug: check users in database
+            VOLUME_PATH=$(docker volume inspect observer_observer_data --format '{{.Mountpoint}}')
+            echo "=== Database users ==="
+            sqlite3 "$VOLUME_PATH/observer.db" "SELECT id, email FROM users;" 2>/dev/null || echo "Could not query database"
+
             echo "Deployed successfully at $(date)"
