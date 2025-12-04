@@ -17,26 +17,11 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            set -e
-            source ~/.bashrc 2>/dev/null || source ~/.profile 2>/dev/null || true
-            export PATH=$PATH:/usr/bin:/usr/local/bin:/snap/bin
-
-            # Find docker
-            DOCKER=$(which docker 2>/dev/null || echo "/snap/bin/docker")
-            echo "Using docker at: $DOCKER"
-
-            # Check if it's a git repo, if not, backup and clone fresh
-            if [ ! -d "/var/www/observer/.git" ]; then
-              echo "Not a git repo, setting up fresh..."
-              [ -d "/var/www/observer" ] && mv /var/www/observer /var/www/observer.backup.$(date +%s)
-              git clone https://github.com/jens-byte/observer.git /var/www/observer
-            fi
-
-            cd /var/www/observer
-            git fetch origin
-            git reset --hard origin/main
-
-            $DOCKER compose down || true
-            $DOCKER compose up --build -d
-
-            echo "Deployed successfully at $(date)"
+            echo "=== Debugging docker location ==="
+            echo "PATH: $PATH"
+            which docker || echo "docker not in PATH"
+            ls -la /usr/bin/docker* 2>/dev/null || echo "not in /usr/bin"
+            ls -la /usr/local/bin/docker* 2>/dev/null || echo "not in /usr/local/bin"
+            ls -la /snap/bin/docker* 2>/dev/null || echo "not in /snap/bin"
+            find / -name "docker" -type f 2>/dev/null | head -5 || echo "not found anywhere"
+            echo "=== End debug ==="
