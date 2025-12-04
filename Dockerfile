@@ -22,9 +22,9 @@ COPY packages/frontend ./packages/frontend
 WORKDIR /app/packages/frontend
 RUN bun run build
 
-# Build backend
+# Build backend (exclude playwright from bundle - it has native deps)
 WORKDIR /app/packages/backend
-RUN bun build --target=bun src/index.ts --outdir=dist
+RUN bun build --target=bun src/index.ts --outdir=dist --external playwright --external playwright-core
 
 # Production stage
 FROM oven/bun:1-slim AS production
