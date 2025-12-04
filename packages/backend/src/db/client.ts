@@ -4,13 +4,12 @@ import * as schema from './schema'
 import { join, dirname } from 'path'
 import { mkdirSync, existsSync } from 'fs'
 
-// Ensure data directory exists
-const dataDir = join(dirname(import.meta.path), '../../data')
+// Use DATABASE_PATH env var if set, otherwise use local data directory
+const dbPath = process.env.DATABASE_PATH || join(dirname(import.meta.path), '../../data/observer.db')
+const dataDir = dirname(dbPath)
 if (!existsSync(dataDir)) {
   mkdirSync(dataDir, { recursive: true })
 }
-
-const dbPath = join(dataDir, 'observer.db')
 const sqlite = new Database(dbPath)
 
 // Enable WAL mode for better concurrent access
