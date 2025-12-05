@@ -191,9 +191,13 @@ export default function Dashboard() {
 
     setIsAdding(true)
     try {
-      let url = newSiteUrl()
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      let url = newSiteUrl().trim()
+      const urlLower = url.toLowerCase()
+      if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://')) {
         url = `https://${url}`
+      } else {
+        // Normalize protocol to lowercase
+        url = url.replace(/^https?:\/\//i, (match) => match.toLowerCase())
       }
 
       const newSite = await sites.create(auth.currentWorkspace.id, {

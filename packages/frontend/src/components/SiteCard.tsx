@@ -15,9 +15,15 @@ export default function SiteCard(props: SiteCardProps) {
   const [isChecking, setIsChecking] = createSignal(false)
   const [isSimulating, setIsSimulating] = createSignal(false)
   const [isDeleting, setIsDeleting] = createSignal(false)
+  const [isSaving, setIsSaving] = createSignal(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false)
+  const [showEditModal, setShowEditModal] = createSignal(false)
   const [canClosePopup, setCanClosePopup] = createSignal(false)
   const [copied, setCopied] = createSignal<string | null>(null)
+
+  // Edit form state
+  const [editName, setEditName] = createSignal('')
+  const [editUrl, setEditUrl] = createSignal('')
 
   const openDeleteConfirm = () => {
     setShowDeleteConfirm(true)
@@ -29,6 +35,38 @@ export default function SiteCard(props: SiteCardProps) {
   const closeDeleteConfirm = () => {
     if (canClosePopup()) {
       setShowDeleteConfirm(false)
+    }
+  }
+
+  const openEditModal = () => {
+    setEditName(props.site.name)
+    setEditUrl(props.site.url)
+    setShowEditModal(true)
+    setCanClosePopup(false)
+    setTimeout(() => setCanClosePopup(true), 200)
+  }
+
+  const closeEditModal = () => {
+    if (canClosePopup()) {
+      setShowEditModal(false)
+    }
+  }
+
+  const handleSave = async (e: Event) => {
+    e.preventDefault()
+    if (isSaving()) return
+    setIsSaving(true)
+    try {
+      await sites.update(props.workspaceId, props.site.id, {
+        name: editName(),
+        url: editUrl(),
+      })
+      setShowEditModal(false)
+      props.onUpdate()
+    } catch (err) {
+      console.error('Save failed:', err)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -273,6 +311,12 @@ export default function SiteCard(props: SiteCardProps) {
             {isChecking() ? 'Checking...' : 'Check'}
           </button>
           <button
+            onClick={(e) => { e.stopPropagation(); openEditModal() }}
+            class="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--text)] hover:bg-[var(--bg-hover)] hover:border-[var(--text-tertiary)]"
+          >
+            Edit
+          </button>
+          <button
             onClick={handleSimulateDown}
             disabled={isSimulating()}
             class="rounded-full border border-red-500/50 px-3 py-1 text-xs text-red-500 hover:bg-red-500/10 hover:border-red-500 disabled:opacity-50"
@@ -312,6 +356,54 @@ export default function SiteCard(props: SiteCardProps) {
                 {isDeleting() ? 'Deleting...' : 'Delete'}
               </button>
             </div>
+          </div>
+        </div>
+      </Show>
+
+      {/* Edit Modal */}
+      <Show when={showEditModal()}>
+        <div class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onMouseDown={closeEditModal} />
+          <div class="relative z-10 w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-6 shadow-2xl">
+            <h3 class="text-lg font-semibold text-[var(--text)] mb-4">Edit Site</h3>
+            <form onSubmit={handleSave} class="space-y-4">
+              <div>
+                <label class="mb-2 block text-sm font-medium text-[var(--text-secondary)]">Name</label>
+                <input
+                  type="text"
+                  value={editName()}
+                  onInput={(e) => setEditName(e.currentTarget.value)}
+                  class="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] px-4 py-2 text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label class="mb-2 block text-sm font-medium text-[var(--text-secondary)]">URL</label>
+                <input
+                  type="url"
+                  value={editUrl()}
+                  onInput={(e) => setEditUrl(e.currentTarget.value)}
+                  class="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] px-4 py-2 text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none"
+                  required
+                />
+              </div>
+              <div class="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  class="rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--text)] hover:bg-[var(--bg-hover)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving()}
+                  class="rounded-full border border-[var(--text)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                >
+                  {isSaving() ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </Show>
