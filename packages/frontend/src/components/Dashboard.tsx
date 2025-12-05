@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [newSiteUrl, setNewSiteUrl] = createSignal('')
   const [isAdding, setIsAdding] = createSignal(false)
   const [viewingUsers, setViewingUsers] = createSignal<PresenceUser[]>([])
+  const [newlyAddedSiteId, setNewlyAddedSiteId] = createSignal<number | null>(null)
 
   const canEdit = () => {
     const role = auth.currentWorkspace?.role
@@ -177,6 +178,7 @@ export default function Dashboard() {
   const groupedSites = () => {
     const filtered = filteredSites()
     return {
+      Pending: filtered.filter((s) => !s.lastStatus || s.lastStatus === 'unknown'),
       Down: filtered.filter((s) => s.lastStatus === 'down'),
       Slow: filtered.filter((s) => s.isSlow && s.lastStatus !== 'down'),
       Up: filtered.filter((s) => s.lastStatus === 'up' && !s.isSlow),
@@ -194,15 +196,44 @@ export default function Dashboard() {
         url = `https://${url}`
       }
 
-      await sites.create(auth.currentWorkspace.id, {
+      const newSite = await sites.create(auth.currentWorkspace.id, {
         name: newSiteName(),
         url,
       })
 
+      // Add the new site to the list immediately
+      setSiteList((prev) => [newSite, ...prev])
+
+      // Track the newly added site for animation
+      setNewlyAddedSiteId(newSite.id)
+
       setNewSiteName('')
       setNewSiteUrl('')
       setShowAddSite(false)
-      fetchSites()
+
+      // Immediately trigger a check for the new site
+      try {
+        await sites.check(auth.currentWorkspace.id, newSite.id)
+        // Clear the slide-in animation before updating data
+        setNewlyAddedSiteId(null)
+        // Fetch updated site data to show check results in the card
+        const updatedSites = await sites.list(auth.currentWorkspace.id)
+        // Update only this site's data while keeping it in Pending position
+        const updatedSite = updatedSites.find((s) => s.id === newSite.id)
+        if (updatedSite) {
+          setSiteList((prev) =>
+            prev.map((s) => (s.id === newSite.id ? { ...updatedSite, lastStatus: null } : s))
+          )
+        }
+        // Keep the site on top for 3 seconds showing the check results
+        await new Promise((resolve) => setTimeout(resolve, 3000))
+        // Move to the correct group
+        setSiteList(updatedSites)
+      } catch {
+        // Check failed, but site was still added - that's ok
+        console.log('Initial check failed, will retry on next interval')
+        setNewlyAddedSiteId(null)
+      }
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -507,6 +538,7 @@ export default function Dashboard() {
                           workspaceId={auth.currentWorkspace!.id}
                           userRole={auth.currentWorkspace!.role}
                           onUpdate={fetchSites}
+                          isNew={newlyAddedSiteId() === site.id}
                         />
                       )}
                     </For>

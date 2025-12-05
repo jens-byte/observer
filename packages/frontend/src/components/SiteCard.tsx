@@ -8,12 +8,29 @@ interface SiteCardProps {
   workspaceId: number
   userRole: WorkspaceRole
   onUpdate: () => void
+  isNew?: boolean
 }
 
 export default function SiteCard(props: SiteCardProps) {
   const [isChecking, setIsChecking] = createSignal(false)
   const [isSimulating, setIsSimulating] = createSignal(false)
+  const [isDeleting, setIsDeleting] = createSignal(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false)
+  const [canClosePopup, setCanClosePopup] = createSignal(false)
   const [copied, setCopied] = createSignal<string | null>(null)
+
+  const openDeleteConfirm = () => {
+    setShowDeleteConfirm(true)
+    setCanClosePopup(false)
+    // Delay before backdrop can close the popup (prevents accidental close)
+    setTimeout(() => setCanClosePopup(true), 200)
+  }
+
+  const closeDeleteConfirm = () => {
+    if (canClosePopup()) {
+      setShowDeleteConfirm(false)
+    }
+  }
 
   const copyToClipboard = async (text: string, label: string) => {
     await navigator.clipboard.writeText(text)
@@ -86,6 +103,20 @@ export default function SiteCard(props: SiteCardProps) {
     }
   }
 
+  const handleDelete = async () => {
+    if (isDeleting()) return
+    setIsDeleting(true)
+    try {
+      await sites.delete(props.workspaceId, props.site.id)
+      setShowDeleteConfirm(false)
+      props.onUpdate()
+    } catch (err) {
+      console.error('Delete failed:', err)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const CopyButton = (props: { text: string; label: string }) => (
     <button
       onClick={() => copyToClipboard(props.text, props.label)}
@@ -125,9 +156,9 @@ export default function SiteCard(props: SiteCardProps) {
   const statusStyles = getStatusStyles()
 
   return (
-    <div class="group relative rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 p-4 pl-5 transition-all hover:border-[var(--border)] hover:bg-[var(--bg-secondary)] overflow-hidden">
-      {/* Status indicator bar */}
-      <div class={`absolute left-0 top-0 bottom-0 w-1 ${statusStyles.bar} ${statusStyles.glow} ${statusStyles.animation}`} />
+    <div class={`group relative rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 p-4 pl-5 transition-all hover:border-[var(--border)] hover:bg-[var(--bg-secondary)] overflow-hidden ${props.isNew ? 'animate-slide-in' : ''}`}>
+      {/* Status indicator bar - pulses bright green when new */}
+      <div class={`absolute left-0 top-0 bottom-0 ${props.isNew ? 'w-1.5 bg-[#10a37f] shadow-[0_0_12px_rgba(16,163,127,0.8)] animate-[newSitePulse_1s_ease-in-out_3]' : `w-1 ${statusStyles.bar} ${statusStyles.glow} ${statusStyles.animation}`}`} />
 
       {/* Header */}
       <div class="flex items-center gap-4 mb-3">
@@ -248,6 +279,40 @@ export default function SiteCard(props: SiteCardProps) {
           >
             {isSimulating() ? 'Simulating...' : props.site.lastStatus === 'down' ? 'Simulate Up' : 'Simulate Down'}
           </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); openDeleteConfirm() }}
+            class="rounded-full border border-red-500/50 px-3 py-1 text-xs text-red-500 hover:bg-red-500/10 hover:border-red-500"
+          >
+            Delete
+          </button>
+        </div>
+      </Show>
+
+      {/* Delete Confirmation Popup */}
+      <Show when={showDeleteConfirm()}>
+        <div class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onMouseDown={closeDeleteConfirm} />
+          <div class="relative z-10 w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-6 shadow-2xl">
+            <h3 class="text-lg font-semibold text-[var(--text)] mb-2">Delete Site</h3>
+            <p class="text-sm text-[var(--text-secondary)] mb-6">
+              Are you sure you want to delete <span class="font-medium text-[var(--text)]">{props.site.name}</span>? This action cannot be undone.
+            </p>
+            <div class="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                class="rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--text)] hover:bg-[var(--bg-hover)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting()}
+                class="rounded-full bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-600 disabled:opacity-50"
+              >
+                {isDeleting() ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
         </div>
       </Show>
     </div>
