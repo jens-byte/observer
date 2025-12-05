@@ -387,6 +387,43 @@ workspaces.post('/:workspaceId/leave', requireWorkspace('guest'), (c: any) => {
   return c.json({ success: true })
 })
 
+// Get workspace by slug (for URL navigation)
+workspaces.get('/by-slug/:slug', requireAuth, (c) => {
+  const user = c.get('user')
+  const slug = c.req.param('slug')
+
+  // Find workspace by slug
+  const workspace = db.select().from(schema.workspaces).where(eq(schema.workspaces.slug, slug)).get()
+
+  if (!workspace) {
+    return c.json({ error: 'Workspace not found' }, 404)
+  }
+
+  // Check if user is a member
+  const membership = db
+    .select()
+    .from(schema.workspaceMembers)
+    .where(
+      and(
+        eq(schema.workspaceMembers.workspaceId, workspace.id),
+        eq(schema.workspaceMembers.userId, user.id)
+      )
+    )
+    .get()
+
+  if (!membership) {
+    return c.json({ error: 'Not a member of this workspace' }, 403)
+  }
+
+  return c.json({
+    id: workspace.id,
+    name: workspace.name,
+    slug: workspace.slug,
+    createdAt: workspace.createdAt,
+    role: membership.role,
+  })
+})
+
 export default workspaces
 
 // Separate router for public invite acceptance

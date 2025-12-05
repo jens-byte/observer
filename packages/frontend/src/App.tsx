@@ -6,6 +6,7 @@ import { ThemeProvider } from './lib/theme'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import InviteAccept from './components/InviteAccept'
+import WorkspaceRedirect from './components/WorkspaceRedirect'
 
 function LoadingScreen() {
   return (
@@ -88,6 +89,7 @@ export default function App() {
         <Route path="/login" component={ProtectedLogin} />
         <Route path="/invite/:token" component={InviteAccept} />
         <Route path="/" component={ProtectedDashboard} />
+        <Route path="/:slug" component={WorkspaceRedirect} />
       </Router>
     </ThemeProvider>
   )

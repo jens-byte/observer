@@ -1,19 +1,15 @@
-import { createSignal, createEffect, Show } from 'solid-js'
+import { createEffect, createSignal, Show } from 'solid-js'
 import { useParams, useNavigate } from '@solidjs/router'
 import { workspaces } from '../lib/api'
 import { useAuth } from '../lib/auth'
 
-export default function InviteAccept() {
+export default function WorkspaceRedirect() {
   const params = useParams()
   const navigate = useNavigate()
   const auth = useAuth()
-  const [isLoading, setIsLoading] = createSignal(true)
   const [error, setError] = createSignal('')
-  const [success, setSuccess] = createSignal(false)
-  const [workspaceName, setWorkspaceName] = createSignal('')
   const [hasAttempted, setHasAttempted] = createSignal(false)
 
-  // Use createEffect to properly react to auth state changes
   createEffect(async () => {
     // Wait for auth to finish loading
     if (auth.isLoading) return
@@ -22,29 +18,21 @@ export default function InviteAccept() {
     if (hasAttempted()) return
     setHasAttempted(true)
 
-    // If not authenticated, redirect to login/signup with return URL
+    // If not authenticated, redirect to login
     if (!auth.isAuthenticated) {
-      const returnUrl = encodeURIComponent(`/invite/${params.token}`)
-      navigate(`/login?return=${returnUrl}&signup=true`)
+      navigate('/login', { replace: true })
       return
     }
 
-    // Try to accept the invite
     try {
-      const result = await workspaces.acceptInvite(params.token)
-      setWorkspaceName(result.workspace.name)
-      setSuccess(true)
-      await auth.refreshAuth()
+      // Try to get workspace by slug
+      const workspace = await workspaces.getBySlug(params.slug)
 
-      // Navigate to dashboard after short delay
-      setTimeout(() => {
-        auth.setCurrentWorkspace(result.workspace)
-        navigate('/')
-      }, 2000)
+      // Set as current workspace and go to dashboard
+      auth.setCurrentWorkspace(workspace)
+      navigate('/', { replace: true })
     } catch (err) {
       setError((err as Error).message)
-    } finally {
-      setIsLoading(false)
     }
   })
 
@@ -64,14 +52,14 @@ export default function InviteAccept() {
         </div>
 
         <div class="rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
-          <Show when={isLoading()}>
+          <Show when={!error()}>
             <div class="flex flex-col items-center gap-4 py-8">
               <div class="h-8 w-8 animate-spin rounded-full border-2 border-[var(--text)] border-t-transparent" />
-              <p class="text-[var(--text-secondary)]">Accepting invite...</p>
+              <p class="text-[var(--text-secondary)]">Loading workspace...</p>
             </div>
           </Show>
 
-          <Show when={!isLoading() && error()}>
+          <Show when={error()}>
             <div class="text-center">
               <div class="mb-4 flex justify-center">
                 <svg class="h-12 w-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,7 +71,7 @@ export default function InviteAccept() {
                   />
                 </svg>
               </div>
-              <h2 class="mb-2 text-xl font-semibold text-[var(--text)]">Invite Failed</h2>
+              <h2 class="mb-2 text-xl font-semibold text-[var(--text)]">Workspace Not Found</h2>
               <p class="mb-6 text-[var(--text-secondary)]">{error()}</p>
               <a
                 href="/"
@@ -91,26 +79,6 @@ export default function InviteAccept() {
               >
                 Go to Dashboard
               </a>
-            </div>
-          </Show>
-
-          <Show when={!isLoading() && success()}>
-            <div class="text-center">
-              <div class="mb-4 flex justify-center">
-                <svg class="h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-              <h2 class="mb-2 text-xl font-semibold text-[var(--text)]">Welcome!</h2>
-              <p class="mb-2 text-[var(--text-secondary)]">
-                You've joined <span class="text-[var(--text)] font-medium">{workspaceName()}</span>
-              </p>
-              <p class="text-sm text-[var(--text-tertiary)]">Redirecting to dashboard...</p>
             </div>
           </Show>
         </div>

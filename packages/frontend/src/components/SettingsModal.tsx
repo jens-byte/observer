@@ -42,6 +42,7 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [inviteRole, setInviteRole] = createSignal<'editor' | 'guest'>('editor')
   const [isInviting, setIsInviting] = createSignal(false)
   const [workspaceName, setWorkspaceName] = createSignal('')
+  const [workspaceSlug, setWorkspaceSlug] = createSignal('')
   const [isSavingWorkspace, setIsSavingWorkspace] = createSignal(false)
 
   const canEdit = () => {
@@ -84,6 +85,7 @@ export default function SettingsModal(props: SettingsModalProps) {
     try {
       setIsLoading(true)
       setWorkspaceName(auth.currentWorkspace.name)
+      setWorkspaceSlug(auth.currentWorkspace.slug)
       const [membersData, invitesData] = await Promise.all([
         workspaces.members(auth.currentWorkspace.id),
         workspaces.invites(auth.currentWorkspace.id),
@@ -97,19 +99,28 @@ export default function SettingsModal(props: SettingsModalProps) {
     }
   }
 
-  const handleSaveWorkspaceName = async () => {
+  const handleSaveWorkspace = async () => {
     if (!auth.currentWorkspace || !isOwner()) return
     const newName = workspaceName().trim()
-    if (!newName || newName === auth.currentWorkspace.name) return
+    const newSlug = workspaceSlug().trim().toLowerCase().replace(/[^a-z0-9-]/g, '-')
+
+    const nameChanged = newName && newName !== auth.currentWorkspace.name
+    const slugChanged = newSlug && newSlug !== auth.currentWorkspace.slug
+
+    if (!nameChanged && !slugChanged) return
 
     setIsSavingWorkspace(true)
     setError('')
     setSuccess('')
 
     try {
-      await workspaces.update(auth.currentWorkspace.id, { name: newName })
+      const updates: { name?: string; slug?: string } = {}
+      if (nameChanged) updates.name = newName
+      if (slugChanged) updates.slug = newSlug
+
+      await workspaces.update(auth.currentWorkspace.id, updates)
       await auth.refreshAuth()
-      setSuccess('Workspace name updated')
+      setSuccess('Workspace updated')
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -575,25 +586,38 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <Show when={isOwner()} fallback={
                     <p class="text-sm text-[var(--text-tertiary)] mb-2">/{auth.currentWorkspace?.slug}</p>
                   }>
-                    <div class="mb-3">
-                      <label class="block text-xs text-[var(--text-tertiary)] mb-1">Workspace Name</label>
-                      <div class="flex gap-2">
+                    <div class="space-y-3 mb-3">
+                      <div>
+                        <label class="block text-xs text-[var(--text-tertiary)] mb-1">Workspace Name</label>
                         <input
                           type="text"
                           value={workspaceName()}
                           onInput={(e) => setWorkspaceName(e.currentTarget.value)}
-                          class="flex-1 rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+                          class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
                         />
-                        <button
-                          onClick={handleSaveWorkspaceName}
-                          disabled={isSavingWorkspace() || workspaceName().trim() === auth.currentWorkspace?.name}
-                          class="rounded-full border border-[var(--text)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
-                        >
-                          {isSavingWorkspace() ? '...' : 'Save'}
-                        </button>
                       </div>
+                      <div>
+                        <label class="block text-xs text-[var(--text-tertiary)] mb-1">URL Slug</label>
+                        <div class="flex items-center gap-1">
+                          <span class="text-sm text-[var(--text-tertiary)]">/</span>
+                          <input
+                            type="text"
+                            value={workspaceSlug()}
+                            onInput={(e) => setWorkspaceSlug(e.currentTarget.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+                            class="flex-1 rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+                            placeholder="my-workspace"
+                          />
+                        </div>
+                        <p class="text-xs text-[var(--text-tertiary)] mt-1">Used in URLs like observer.megavisor.be/{workspaceSlug() || 'slug'}</p>
+                      </div>
+                      <button
+                        onClick={handleSaveWorkspace}
+                        disabled={isSavingWorkspace() || (workspaceName().trim() === auth.currentWorkspace?.name && workspaceSlug().trim() === auth.currentWorkspace?.slug)}
+                        class="rounded-full border border-[var(--text)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                      >
+                        {isSavingWorkspace() ? 'Saving...' : 'Save'}
+                      </button>
                     </div>
-                    <p class="text-sm text-[var(--text-tertiary)]">/{auth.currentWorkspace?.slug}</p>
                   </Show>
                   <div class="flex items-center gap-2 mt-2">
                     <span class="text-sm text-[var(--text-secondary)]">Your role:</span>

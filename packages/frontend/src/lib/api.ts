@@ -83,6 +83,9 @@ export const workspaces = {
 
   acceptInvite: (token: string) =>
     fetchApi<{ workspace: WorkspaceWithRole }>(`/invites/${token}/accept`, { method: 'POST' }),
+
+  getBySlug: (slug: string) =>
+    fetchApi<WorkspaceWithRole>(`/workspaces/by-slug/${slug}`),
 }
 
 // Sites
