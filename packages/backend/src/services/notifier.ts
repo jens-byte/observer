@@ -332,6 +332,29 @@ export async function testWebhook(workspaceId: number): Promise<boolean> {
   })
 }
 
+export async function testSlackBot(workspaceId: number): Promise<boolean> {
+  const settings = db
+    .select()
+    .from(schema.settings)
+    .where(eq(schema.settings.workspaceId, workspaceId))
+    .get()
+
+  if (!settings?.slackBotToken || !settings?.slackChannelId) {
+    throw new Error('Slack Bot token and channel ID are required')
+  }
+
+  return sendSlackBotMessage(
+    settings.slackBotToken,
+    settings.slackChannelId,
+    {
+      siteName: 'Test Site',
+      siteUrl: 'https://example.com',
+      status: 'down',
+      errorMessage: 'This is a test notification from Observer',
+    }
+  )
+}
+
 export async function testEmail(workspaceId: number): Promise<boolean> {
   const settings = db
     .select()

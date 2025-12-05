@@ -142,4 +142,9 @@ export const settings = {
     fetchApi<{ success: boolean }>(`/workspaces/${workspaceId}/settings/test-webhook`, {
       method: 'POST',
     }),
+
+  testSlackBot: (workspaceId: number) =>
+    fetchApi<{ success: boolean }>(`/workspaces/${workspaceId}/settings/test-slack-bot`, {
+      method: 'POST',
+    }),
 }

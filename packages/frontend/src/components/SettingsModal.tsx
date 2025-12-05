@@ -198,6 +198,16 @@ export default function SettingsModal(props: SettingsModalProps) {
     }
   }
 
+  const handleTestSlackBot = async () => {
+    if (!auth.currentWorkspace) return
+    try {
+      await settings.testSlackBot(auth.currentWorkspace.id)
+      setSuccess('Test Slack message sent')
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+
   const handleInvite = async (e: Event) => {
     e.preventDefault()
     if (!auth.currentWorkspace || !inviteEmail()) return
@@ -432,6 +442,15 @@ export default function SettingsModal(props: SettingsModalProps) {
                               <div class="h-6 w-11 rounded-full bg-[var(--bg-tertiary)] peer-checked:bg-[var(--accent)] peer-disabled:opacity-50 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
                             </label>
                           </div>
+                          <Show when={canEdit() && slackBotToken() && slackChannelId()}>
+                            <button
+                              type="button"
+                              onClick={handleTestSlackBot}
+                              class="text-xs text-[var(--accent)] hover:underline mt-2"
+                            >
+                              Send test message
+                            </button>
+                          </Show>
                         </div>
                       </div>
 

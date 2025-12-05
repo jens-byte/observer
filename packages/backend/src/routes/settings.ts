@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { updateSettingsSchema } from '@observer/shared'
 import type { Settings } from '@observer/shared'
 import { requireWorkspace, type WorkspaceContext } from '../middleware/auth'
-import { testWebhook, testEmail } from '../services/notifier'
+import { testWebhook, testEmail, testSlackBot } from '../services/notifier'
 
 const settings = new Hono<WorkspaceContext>()
 
@@ -89,6 +89,18 @@ settings.post('/test-webhook', requireWorkspace('editor'), async (c: any) => {
 
   try {
     const success = await testWebhook(workspaceId)
+    return c.json({ success })
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 400)
+  }
+})
+
+// Test Slack Bot
+settings.post('/test-slack-bot', requireWorkspace('editor'), async (c: any) => {
+  const workspaceId = c.get('workspaceId')
+
+  try {
+    const success = await testSlackBot(workspaceId)
     return c.json({ success })
   } catch (error) {
     return c.json({ error: (error as Error).message }, 400)
