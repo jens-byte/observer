@@ -1,9 +1,9 @@
 import { createSignal, createEffect, Show, For } from 'solid-js'
 import type { WorkspaceMember, WorkspaceInvite, WorkspaceRole } from '@observer/shared'
 import { useAuth } from '../lib/auth'
-import { settings, workspaces } from '../lib/api'
+import { settings, workspaces, auth as authApi } from '../lib/api'
 
-type SettingsTab = 'workspace' | 'notifications' | 'email'
+type SettingsTab = 'user' | 'workspace' | 'notifications' | 'email'
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -13,7 +13,7 @@ interface SettingsModalProps {
 
 export default function SettingsModal(props: SettingsModalProps) {
   const auth = useAuth()
-  const [activeTab, setActiveTab] = createSignal<SettingsTab>(props.initialTab || 'workspace')
+  const [activeTab, setActiveTab] = createSignal<SettingsTab>(props.initialTab || 'user')
   const [isLoading, setIsLoading] = createSignal(true)
   const [isSaving, setIsSaving] = createSignal(false)
   const [error, setError] = createSignal('')
@@ -44,6 +44,12 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [workspaceName, setWorkspaceName] = createSignal('')
   const [workspaceSlug, setWorkspaceSlug] = createSignal('')
   const [isSavingWorkspace, setIsSavingWorkspace] = createSignal(false)
+
+  // User settings
+  const [userFirstName, setUserFirstName] = createSignal('')
+  const [userLastName, setUserLastName] = createSignal('')
+  const [userEmail, setUserEmail] = createSignal('')
+  const [isSavingUser, setIsSavingUser] = createSignal(false)
 
   const canEdit = () => {
     const role = auth.currentWorkspace?.role
@@ -78,6 +84,14 @@ export default function SettingsModal(props: SettingsModalProps) {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const fetchUserData = () => {
+    if (!auth.user) return
+    setUserFirstName(auth.user.firstName || '')
+    setUserLastName(auth.user.lastName || '')
+    setUserEmail(auth.user.email)
+    setIsLoading(false)
   }
 
   const fetchWorkspaceData = async () => {
@@ -128,11 +142,46 @@ export default function SettingsModal(props: SettingsModalProps) {
     }
   }
 
+  const handleSaveUser = async () => {
+    if (!auth.user) return
+
+    const firstName = userFirstName().trim() || null
+    const lastName = userLastName().trim() || null
+    const email = userEmail().trim()
+
+    const firstNameChanged = firstName !== (auth.user.firstName || null)
+    const lastNameChanged = lastName !== (auth.user.lastName || null)
+    const emailChanged = email !== auth.user.email
+
+    if (!firstNameChanged && !lastNameChanged && !emailChanged) return
+
+    setIsSavingUser(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const updates: { firstName?: string | null; lastName?: string | null; email?: string } = {}
+      if (firstNameChanged) updates.firstName = firstName
+      if (lastNameChanged) updates.lastName = lastName
+      if (emailChanged) updates.email = email
+
+      await authApi.updateProfile(updates)
+      await auth.refreshAuth()
+      setSuccess('Profile updated')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setIsSavingUser(false)
+    }
+  }
+
   createEffect(() => {
     if (props.isOpen && auth.currentWorkspace) {
       setError('')
       setSuccess('')
-      if ((activeTab() === 'notifications' || activeTab() === 'email') && !isGuest()) {
+      if (activeTab() === 'user') {
+        fetchUserData()
+      } else if ((activeTab() === 'notifications' || activeTab() === 'email') && !isGuest()) {
         fetchSettings()
       } else {
         fetchWorkspaceData()
@@ -142,7 +191,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 
   createEffect(() => {
     if (props.isOpen) {
-      setActiveTab(props.initialTab || 'workspace')
+      setActiveTab(props.initialTab || 'user')
     }
   })
 
@@ -150,7 +199,9 @@ export default function SettingsModal(props: SettingsModalProps) {
     setActiveTab(tab)
     setError('')
     setSuccess('')
-    if (tab === 'notifications' || tab === 'email') {
+    if (tab === 'user') {
+      fetchUserData()
+    } else if (tab === 'notifications' || tab === 'email') {
       fetchSettings()
     } else {
       fetchWorkspaceData()
@@ -228,12 +279,17 @@ export default function SettingsModal(props: SettingsModalProps) {
     setSuccess('')
 
     try {
-      await workspaces.invite(auth.currentWorkspace.id, {
+      const result = await workspaces.invite(auth.currentWorkspace.id, {
         email: inviteEmail(),
         role: inviteRole(),
       })
       setInviteEmail('')
-      setSuccess('Invite sent')
+      // Check if user was added directly or invite was sent
+      if ('added' in result && result.added) {
+        setSuccess('User added to workspace')
+      } else {
+        setSuccess('Invite sent')
+      }
       fetchWorkspaceData()
     } catch (err) {
       setError((err as Error).message)
@@ -304,7 +360,8 @@ export default function SettingsModal(props: SettingsModalProps) {
   }
 
   const menuItems = [
-    { id: 'workspace' as SettingsTab, label: 'Workspace', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z', hidden: false },
+    { id: 'user' as SettingsTab, label: 'User', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', hidden: false },
+    { id: 'workspace' as SettingsTab, label: 'Workspaces', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z', hidden: false },
     { id: 'notifications' as SettingsTab, label: 'Notifications', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9', hidden: isGuest() },
     { id: 'email' as SettingsTab, label: 'Email', icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', hidden: isGuest() },
   ]
@@ -355,7 +412,7 @@ export default function SettingsModal(props: SettingsModalProps) {
             {/* Header */}
             <div class="mb-6 flex items-center justify-between">
               <h2 class="text-xl font-semibold text-[var(--text)]">
-                {activeTab() === 'notifications' ? 'Notifications' : activeTab() === 'email' ? 'Email' : 'Workspace'}
+                {activeTab() === 'user' ? 'User Settings' : activeTab() === 'notifications' ? 'Notifications' : activeTab() === 'email' ? 'Email' : 'Workspaces'}
               </h2>
               <Show when={(activeTab() === 'notifications' || activeTab() === 'email') && canEdit()}>
                 <button
@@ -385,6 +442,56 @@ export default function SettingsModal(props: SettingsModalProps) {
             <Show when={isLoading()}>
               <div class="flex items-center justify-center py-12">
                 <div class="h-6 w-6 animate-spin rounded-full border-2 border-[var(--text)] border-t-transparent" />
+              </div>
+            </Show>
+
+            {/* User Content */}
+            <Show when={!isLoading() && activeTab() === 'user'}>
+              <div class="space-y-6">
+                <section>
+                  <div class="space-y-4">
+                    <div>
+                      <label class="block text-sm font-medium text-[var(--text)] mb-1">First Name</label>
+                      <input
+                        type="text"
+                        value={userFirstName()}
+                        onInput={(e) => setUserFirstName(e.currentTarget.value)}
+                        class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none"
+                        placeholder="Enter your first name"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="block text-sm font-medium text-[var(--text)] mb-1">Last Name</label>
+                      <input
+                        type="text"
+                        value={userLastName()}
+                        onInput={(e) => setUserLastName(e.currentTarget.value)}
+                        class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none"
+                        placeholder="Enter your last name"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="block text-sm font-medium text-[var(--text)] mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        value={userEmail()}
+                        onInput={(e) => setUserEmail(e.currentTarget.value)}
+                        class="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none"
+                        placeholder="Enter your email address"
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleSaveUser}
+                      disabled={isSavingUser()}
+                      class="rounded-full border border-[var(--text)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                    >
+                      {isSavingUser() ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </section>
               </div>
             </Show>
 

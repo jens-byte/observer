@@ -53,6 +53,8 @@ export const requireAuth = createMiddleware<AuthContext>(async (c, next) => {
     id: user.id,
     email: user.email,
     name: user.name,
+    firstName: user.firstName,
+    lastName: user.lastName,
     avatarUrl: user.avatarUrl,
     createdAt: user.createdAt,
   })
@@ -124,6 +126,8 @@ export function requireWorkspace(minRole: WorkspaceRole = 'guest') {
       id: user.id,
       email: user.email,
       name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
       avatarUrl: user.avatarUrl,
       createdAt: user.createdAt,
     })

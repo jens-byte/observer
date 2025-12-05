@@ -12,7 +12,7 @@ interface AuthState {
 
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, name: string) => Promise<void>
+  register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>
   logout: () => Promise<void>
   setCurrentWorkspace: (workspace: WorkspaceWithRole) => void
   refreshAuth: () => Promise<void>
@@ -56,8 +56,8 @@ export function AuthProvider(props: { children: JSX.Element }) {
     }
   }
 
-  const register = async (email: string, password: string, name: string) => {
-    const response = await auth.register({ email, password, name })
+  const register = async (email: string, password: string, firstName: string, lastName: string) => {
+    const response = await auth.register({ email, password, firstName, lastName })
     setUser(response.user)
     setWorkspaces(response.workspaces)
     setCurrentWorkspaceSignal(response.workspaces[0] || null)

@@ -1,11 +1,13 @@
-import type { SseEvent, SseCheckEvent, SseSiteUpdateEvent } from '@observer/shared'
+import type { SseEvent, SseCheckEvent, SseSiteUpdateEvent, SsePresenceEvent, PresenceUser } from '@observer/shared'
 
 type EventCallback = (event: SseEvent) => void
+type PresenceCallback = (users: PresenceUser[]) => void
 
 class SSEClient {
   private eventSource: EventSource | null = null
   private workspaceId: number | null = null
   private callbacks: Set<EventCallback> = new Set()
+  private presenceCallbacks: Set<PresenceCallback> = new Set()
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null
   private reconnectDelay = 1000
 
@@ -55,6 +57,11 @@ class SSEClient {
         this.notifyCallbacks(parsed)
       })
 
+      this.eventSource.addEventListener('presence', (e) => {
+        const parsed = JSON.parse(e.data) as SsePresenceEvent
+        this.notifyPresenceCallbacks(parsed.users)
+      })
+
       this.eventSource.addEventListener('heartbeat', () => {
         // Just keep-alive, no action needed
       })
@@ -82,6 +89,23 @@ class SSEClient {
     this.callbacks.add(callback)
     return () => {
       this.callbacks.delete(callback)
+    }
+  }
+
+  subscribePresence(callback: PresenceCallback) {
+    this.presenceCallbacks.add(callback)
+    return () => {
+      this.presenceCallbacks.delete(callback)
+    }
+  }
+
+  private notifyPresenceCallbacks(users: PresenceUser[]) {
+    for (const callback of this.presenceCallbacks) {
+      try {
+        callback(users)
+      } catch (error) {
+        console.error('[SSE] Presence callback error:', error)
+      }
     }
   }
 

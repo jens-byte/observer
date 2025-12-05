@@ -6,6 +6,8 @@ export interface User {
   id: number
   email: string
   name: string
+  firstName: string | null
+  lastName: string | null
   avatarUrl: string | null
   createdAt: string
 }
@@ -174,7 +176,7 @@ export interface DashboardStats {
 }
 
 // SSE Event types
-export type SseEventType = 'check' | 'site-update' | 'connected'
+export type SseEventType = 'check' | 'site-update' | 'connected' | 'presence'
 
 export interface SseCheckEvent {
   type: 'check'
@@ -194,4 +196,16 @@ export interface SseConnectedEvent {
   workspaceId: number
 }
 
-export type SseEvent = SseCheckEvent | SseSiteUpdateEvent | SseConnectedEvent
+// Presence tracking
+export interface PresenceUser {
+  id: number
+  firstName: string | null
+  lastName: string | null
+}
+
+export interface SsePresenceEvent {
+  type: 'presence'
+  users: PresenceUser[]
+}
+
+export type SseEvent = SseCheckEvent | SseSiteUpdateEvent | SseConnectedEvent | SsePresenceEvent

@@ -205,9 +205,10 @@ workspaces.post('/:workspaceId/invite', requireWorkspace('editor'), async (c: an
     return c.json({ error: 'Editors can only invite guests' }, 403)
   }
 
-  // Check if user is already a member
+  // Check if user already exists in the system
   const existingUser = db.select().from(schema.users).where(eq(schema.users.email, email)).get()
   if (existingUser) {
+    // Check if already a member
     const existingMember = db
       .select()
       .from(schema.workspaceMembers)
@@ -221,8 +222,25 @@ workspaces.post('/:workspaceId/invite', requireWorkspace('editor'), async (c: an
     if (existingMember) {
       return c.json({ error: 'User is already a member' }, 400)
     }
+
+    // User exists but not a member - add them directly
+    db.insert(schema.workspaceMembers).values({
+      workspaceId,
+      userId: existingUser.id,
+      role,
+      invitedBy: user.id,
+    }).run()
+
+    // Return success with added flag
+    return c.json({
+      added: true,
+      email,
+      role,
+      message: 'User added to workspace',
+    })
   }
 
+  // User doesn't exist - create an invite for new user
   // Check for existing invite
   const existingInvite = db
     .select()

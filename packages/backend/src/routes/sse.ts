@@ -1,18 +1,56 @@
 import { Hono } from 'hono'
+import { getCookie } from 'hono/cookie'
 import { streamSSE } from 'hono/streaming'
-import type { SseEvent } from '@observer/shared'
+import { db, schema } from '../db/client'
+import { eq, and, gt } from 'drizzle-orm'
+import type { SseEvent, PresenceUser, SsePresenceEvent } from '@observer/shared'
+
+// Connection info with user data
+interface ConnectionInfo {
+  send: (event: SseEvent) => void
+  user: PresenceUser
+}
 
 // Store active connections per workspace
-const connections = new Map<number, Set<(event: SseEvent) => void>>()
+const connections = new Map<number, Map<string, ConnectionInfo>>()
+
+// Get current users in a workspace (deduplicated by user id)
+function getWorkspaceUsers(workspaceId: number): PresenceUser[] {
+  const workspaceConnections = connections.get(workspaceId)
+  if (!workspaceConnections) return []
+
+  const userMap = new Map<number, PresenceUser>()
+  for (const conn of workspaceConnections.values()) {
+    userMap.set(conn.user.id, conn.user)
+  }
+  return Array.from(userMap.values())
+}
+
+// Broadcast presence update to all users in workspace
+function broadcastPresence(workspaceId: number) {
+  const workspaceConnections = connections.get(workspaceId)
+  if (!workspaceConnections) return
+
+  const users = getWorkspaceUsers(workspaceId)
+  const event: SsePresenceEvent = { type: 'presence', users }
+
+  for (const conn of workspaceConnections.values()) {
+    try {
+      conn.send(event)
+    } catch {
+      // Connection might be closed
+    }
+  }
+}
 
 // Broadcast an event to all connections for a workspace
 export function broadcast(workspaceId: number, event: SseEvent) {
   const workspaceConnections = connections.get(workspaceId)
   console.log(`[SSE] Broadcasting to workspace ${workspaceId}:`, event.type, `(${workspaceConnections?.size || 0} connections)`)
   if (workspaceConnections) {
-    for (const send of workspaceConnections) {
+    for (const conn of workspaceConnections.values()) {
       try {
-        send(event)
+        conn.send(event)
       } catch {
         // Connection might be closed
       }
@@ -26,8 +64,42 @@ const sse = new Hono()
 sse.get('/events/:workspaceId', async (c) => {
   const workspaceId = Number(c.req.param('workspaceId'))
 
-  // Note: In a full implementation, you'd verify auth via cookie/token
-  // For now, we rely on the frontend only connecting after auth
+  // Verify auth via session cookie
+  const sessionId = getCookie(c, 'session')
+  if (!sessionId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const session = db
+    .select()
+    .from(schema.sessions)
+    .where(and(eq(schema.sessions.id, sessionId), gt(schema.sessions.expiresAt, new Date().toISOString())))
+    .get()
+
+  if (!session) {
+    return c.json({ error: 'Session expired' }, 401)
+  }
+
+  const user = db.select().from(schema.users).where(eq(schema.users.id, session.userId)).get()
+  if (!user) {
+    return c.json({ error: 'User not found' }, 401)
+  }
+
+  // Check if user is a member of the workspace
+  const membership = db
+    .select()
+    .from(schema.workspaceMembers)
+    .where(
+      and(eq(schema.workspaceMembers.workspaceId, workspaceId), eq(schema.workspaceMembers.userId, user.id))
+    )
+    .get()
+
+  if (!membership) {
+    return c.json({ error: 'Not a member of this workspace' }, 403)
+  }
+
+  // Create a unique connection ID
+  const connectionId = `${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
   return streamSSE(c, async (stream) => {
     // Create send function
@@ -38,14 +110,27 @@ sse.get('/events/:workspaceId', async (c) => {
       })
     }
 
+    // Create connection info
+    const connectionInfo: ConnectionInfo = {
+      send,
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+    }
+
     // Add connection to workspace
     if (!connections.has(workspaceId)) {
-      connections.set(workspaceId, new Set())
+      connections.set(workspaceId, new Map())
     }
-    connections.get(workspaceId)!.add(send)
+    connections.get(workspaceId)!.set(connectionId, connectionInfo)
 
     // Send connected event
     send({ type: 'connected', workspaceId })
+
+    // Broadcast presence update to all users (including the new one)
+    broadcastPresence(workspaceId)
 
     // Keep connection alive with periodic heartbeats
     const heartbeatInterval = setInterval(() => {
@@ -67,7 +152,9 @@ sse.get('/events/:workspaceId', async (c) => {
       // Connection closed
     } finally {
       clearInterval(heartbeatInterval)
-      connections.get(workspaceId)?.delete(send)
+      connections.get(workspaceId)?.delete(connectionId)
+      // Broadcast updated presence after user disconnects
+      broadcastPresence(workspaceId)
     }
   })
 })

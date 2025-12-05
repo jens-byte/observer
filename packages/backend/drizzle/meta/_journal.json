@@ -15,6 +15,13 @@
       "when": 1764835087423,
       "tag": "0001_wealthy_lily_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1764956371998,
+      "tag": "0002_slimy_ares",
+      "breakpoints": true
     }
   ]
 }

@@ -12,7 +12,8 @@ export const loginSchema = z.object({
 export const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  name: z.string().min(1, 'Name is required').max(100),
+  firstName: z.string().min(1, 'First name is required').max(100),
+  lastName: z.string().min(1, 'Last name is required').max(100),
 })
 
 // Workspace schemas
@@ -95,7 +96,15 @@ export const bulkImportSitesSchema = z.object({
   ),
 })
 
+// User profile schema
+export const updateUserSchema = z.object({
+  firstName: z.string().max(100).nullable().optional(),
+  lastName: z.string().max(100).nullable().optional(),
+  email: z.string().email('Invalid email address').optional(),
+})
+
 // Type exports from schemas
+export type UpdateUserInput = z.infer<typeof updateUserSchema>
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>

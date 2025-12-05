@@ -49,7 +49,14 @@ function PublicRoute(props: { children: JSX.Element }) {
 
   createEffect(() => {
     if (!auth.isLoading && auth.isAuthenticated) {
-      navigate('/', { replace: true })
+      // Check for return URL in query params - if present, navigate there instead of /
+      const params = new URLSearchParams(window.location.search)
+      const returnUrl = params.get('return')
+      if (returnUrl) {
+        navigate(decodeURIComponent(returnUrl), { replace: true })
+      } else {
+        navigate('/', { replace: true })
+      }
     }
   })
 

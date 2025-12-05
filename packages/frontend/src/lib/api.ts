@@ -43,6 +43,9 @@ export const auth = {
   logout: () => fetchApi<void>('/auth/logout', { method: 'POST' }),
 
   me: () => fetchApi<AuthResponse>('/auth/me'),
+
+  updateProfile: (data: { firstName?: string | null; lastName?: string | null; email?: string }) =>
+    fetchApi<{ user: AuthResponse['user'] }>('/auth/me', { method: 'PUT', body: JSON.stringify(data) }),
 }
 
 // Workspaces
@@ -62,7 +65,7 @@ export const workspaces = {
   members: (id: number) => fetchApi<WorkspaceMember[]>(`/workspaces/${id}/members`),
 
   invite: (id: number, data: { email: string; role: 'editor' | 'guest' }) =>
-    fetchApi<WorkspaceInvite>(`/workspaces/${id}/invite`, {
+    fetchApi<WorkspaceInvite | { added: true; email: string; role: string; message: string }>(`/workspaces/${id}/invite`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),

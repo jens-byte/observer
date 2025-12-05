@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { setCookie, deleteCookie } from 'hono/cookie'
 import { db, schema } from '../db/client'
 import { eq } from 'drizzle-orm'
-import { loginSchema, registerSchema } from '@observer/shared'
+import { loginSchema, registerSchema, updateUserSchema } from '@observer/shared'
 import { hashPassword, verifyPassword, generateToken, generateSlug, getSessionExpiry } from '../lib/utils'
 import { requireAuth, type AuthContext } from '../middleware/auth'
 import type { WorkspaceWithRole } from '@observer/shared'
@@ -18,7 +18,8 @@ auth.post('/register', async (c) => {
     return c.json({ error: result.error.errors[0]?.message || 'Invalid input' }, 400)
   }
 
-  const { email, password, name } = result.data
+  const { email, password, firstName, lastName } = result.data
+  const fullName = `${firstName} ${lastName}`.trim()
 
   // Check if email already exists
   const existing = db.select().from(schema.users).where(eq(schema.users.email, email)).get()
@@ -36,17 +37,19 @@ auth.post('/register', async (c) => {
     .values({
       email,
       passwordHash,
-      name,
+      name: fullName,
+      firstName,
+      lastName,
     })
     .returning()
     .get()
 
   // Create personal workspace for new user
-  const workspaceSlug = generateSlug(`${name}-workspace`)
+  const workspaceSlug = generateSlug(`${firstName}-workspace`)
   const workspaceResult = db
     .insert(schema.workspaces)
     .values({
-      name: `${name}'s Workspace`,
+      name: `${firstName}'s Workspace`,
       slug: workspaceSlug,
     })
     .returning()
@@ -97,6 +100,8 @@ auth.post('/register', async (c) => {
       id: userResult.id,
       email: userResult.email,
       name: userResult.name,
+      firstName: userResult.firstName,
+      lastName: userResult.lastName,
       avatarUrl: userResult.avatarUrl,
       createdAt: userResult.createdAt,
     },
@@ -170,6 +175,8 @@ auth.post('/login', async (c) => {
       id: user.id,
       email: user.email,
       name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
       avatarUrl: user.avatarUrl,
       createdAt: user.createdAt,
     },
@@ -214,6 +221,52 @@ auth.get('/me', requireAuth, (c) => {
   }))
 
   return c.json({ user, workspaces })
+})
+
+// Update current user profile
+auth.put('/me', requireAuth, async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json()
+  const result = updateUserSchema.safeParse(body)
+
+  if (!result.success) {
+    return c.json({ error: result.error.errors[0]?.message || 'Invalid input' }, 400)
+  }
+
+  const { firstName, lastName, email } = result.data
+
+  // Check if email is changing and if it's already taken
+  if (email && email !== user.email) {
+    const existing = db.select().from(schema.users).where(eq(schema.users.email, email)).get()
+    if (existing) {
+      return c.json({ error: 'Email already in use' }, 400)
+    }
+  }
+
+  // Build update object
+  const updates: Record<string, string | null> = {}
+  if (firstName !== undefined) updates.firstName = firstName
+  if (lastName !== undefined) updates.lastName = lastName
+  if (email !== undefined) updates.email = email
+
+  if (Object.keys(updates).length > 0) {
+    db.update(schema.users).set(updates).where(eq(schema.users.id, user.id)).run()
+  }
+
+  // Get updated user
+  const updatedUser = db.select().from(schema.users).where(eq(schema.users.id, user.id)).get()
+
+  return c.json({
+    user: {
+      id: updatedUser!.id,
+      email: updatedUser!.email,
+      name: updatedUser!.name,
+      firstName: updatedUser!.firstName,
+      lastName: updatedUser!.lastName,
+      avatarUrl: updatedUser!.avatarUrl,
+      createdAt: updatedUser!.createdAt,
+    },
+  })
 })
 
 export default auth

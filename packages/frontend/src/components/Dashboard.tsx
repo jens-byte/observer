@@ -1,5 +1,5 @@
 import { createSignal, createEffect, Show, For, onCleanup } from 'solid-js'
-import type { SiteWithDetails, DashboardStats, SseCheckEvent } from '@observer/shared'
+import type { SiteWithDetails, DashboardStats, SseCheckEvent, PresenceUser } from '@observer/shared'
 import { useAuth } from '../lib/auth'
 import { useTheme } from '../lib/theme'
 import { sites } from '../lib/api'
@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [newSiteName, setNewSiteName] = createSignal('')
   const [newSiteUrl, setNewSiteUrl] = createSignal('')
   const [isAdding, setIsAdding] = createSignal(false)
+  const [viewingUsers, setViewingUsers] = createSignal<PresenceUser[]>([])
 
   const canEdit = () => {
     const role = auth.currentWorkspace?.role
@@ -103,14 +104,29 @@ export default function Dashboard() {
     }
   })
 
+  // Subscribe to presence updates
+  const unsubscribePresence = sseClient.subscribePresence((users) => {
+    // Filter out the current user
+    const others = users.filter((u) => u.id !== auth.user?.id)
+    setViewingUsers(others)
+  })
+
   // Auto-refresh every 60 seconds (as fallback, SSE should handle most updates)
   const refreshInterval = setInterval(fetchSites, 60000)
 
   onCleanup(() => {
     clearInterval(refreshInterval)
     unsubscribe()
+    unsubscribePresence()
     sseClient.disconnect()
   })
+
+  // Helper to get user initials
+  const getInitials = (user: PresenceUser) => {
+    const first = user.firstName?.charAt(0)?.toUpperCase() || ''
+    const last = user.lastName?.charAt(0)?.toUpperCase() || ''
+    return first + last || '?'
+  }
 
   const stats = (): DashboardStats => {
     const list = siteList()
@@ -246,6 +262,30 @@ export default function Dashboard() {
               <span class="text-lg font-medium text-[var(--text)]">Observer</span>
             </div>
             <WorkspaceSwitcher />
+
+            {/* Viewing indicators */}
+            <Show when={viewingUsers().length > 0}>
+              <div class="flex items-center gap-1">
+                <span class="text-xs text-[var(--text-tertiary)] mr-1">Also viewing:</span>
+                <div class="flex -space-x-2">
+                  <For each={viewingUsers().slice(0, 5)}>
+                    {(user) => (
+                      <div
+                        class="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent)]/20 text-xs font-medium text-[var(--accent)] border-2 border-[var(--bg)] ring-1 ring-[var(--border)]"
+                        title={`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown'}
+                      >
+                        {getInitials(user)}
+                      </div>
+                    )}
+                  </For>
+                  <Show when={viewingUsers().length > 5}>
+                    <div class="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--bg-tertiary)] text-xs font-medium text-[var(--text-secondary)] border-2 border-[var(--bg)]">
+                      +{viewingUsers().length - 5}
+                    </div>
+                  </Show>
+                </div>
+              </div>
+            </Show>
           </div>
 
           <div class="flex items-center gap-4">
@@ -287,7 +327,9 @@ export default function Dashboard() {
               </svg>
             </button>
             <div class="h-5 w-px bg-[var(--border)]" />
-            <span class="text-sm text-[var(--text-secondary)]">{auth.user?.name}</span>
+            <span class="text-sm text-[var(--text-secondary)]">
+              {[auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(' ') || auth.user?.name}
+            </span>
             <button
               onClick={handleLogout}
               class="rounded-full border border-[var(--border)] px-4 py-1.5 text-sm text-[var(--text)] transition-colors hover:bg-[var(--bg-hover)] hover:border-[var(--text-tertiary)]"

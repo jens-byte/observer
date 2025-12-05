@@ -11,7 +11,8 @@ export default function Login() {
   const [isRegister, setIsRegister] = createSignal(searchParams.signup === 'true')
   const [email, setEmail] = createSignal('')
   const [password, setPassword] = createSignal('')
-  const [name, setName] = createSignal('')
+  const [firstName, setFirstName] = createSignal('')
+  const [lastName, setLastName] = createSignal('')
   const [error, setError] = createSignal('')
   const [isSubmitting, setIsSubmitting] = createSignal(false)
 
@@ -22,7 +23,7 @@ export default function Login() {
 
     try {
       if (isRegister()) {
-        await auth.register(email(), password(), name())
+        await auth.register(email(), password(), firstName(), lastName())
       } else {
         await auth.login(email(), password())
       }
@@ -67,16 +68,29 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} class="space-y-4">
             <Show when={isRegister()}>
-              <div>
-                <label class="mb-2 block text-sm font-medium text-[var(--text-secondary)]">Name</label>
-                <input
-                  type="text"
-                  value={name()}
-                  onInput={(e) => setName(e.currentTarget.value)}
-                  class="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] px-4 py-3 text-[var(--text)] placeholder-[var(--text-tertiary)] transition-colors focus:border-[var(--accent)] focus:outline-none"
-                  placeholder="Your name"
-                  required={isRegister()}
-                />
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-[var(--text-secondary)]">First Name</label>
+                  <input
+                    type="text"
+                    value={firstName()}
+                    onInput={(e) => setFirstName(e.currentTarget.value)}
+                    class="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] px-4 py-3 text-[var(--text)] placeholder-[var(--text-tertiary)] transition-colors focus:border-[var(--accent)] focus:outline-none"
+                    placeholder="First name"
+                    required={isRegister()}
+                  />
+                </div>
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-[var(--text-secondary)]">Last Name</label>
+                  <input
+                    type="text"
+                    value={lastName()}
+                    onInput={(e) => setLastName(e.currentTarget.value)}
+                    class="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] px-4 py-3 text-[var(--text)] placeholder-[var(--text-tertiary)] transition-colors focus:border-[var(--accent)] focus:outline-none"
+                    placeholder="Last name"
+                    required={isRegister()}
+                  />
+                </div>
               </div>
             </Show>
 
