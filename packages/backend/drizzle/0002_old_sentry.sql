@@ -1,1 +1,0 @@
-ALTER TABLE `settings` ADD `slack_enabled` integer DEFAULT false NOT NULL;
