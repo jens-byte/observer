@@ -203,6 +203,7 @@ async function sendSlackBotMessage(
 
 // Helper to send text-only Slack message
 async function sendSlackTextMessage(botToken: string, channelId: string, text: string): Promise<boolean> {
+  console.log(`[Notifier] Sending Slack message to channel ${channelId}`)
   const response = await fetch('https://slack.com/api/chat.postMessage', {
     method: 'POST',
     headers: {
@@ -216,11 +217,12 @@ async function sendSlackTextMessage(botToken: string, channelId: string, text: s
     }),
   })
 
-  const result = await response.json() as { ok: boolean; error?: string }
+  const result = await response.json() as { ok: boolean; error?: string; channel?: string }
   if (!result.ok) {
     console.error('[Notifier] Slack message failed:', result.error)
     return false
   }
+  console.log(`[Notifier] Slack message sent successfully to channel ${result.channel}`)
   return true
 }
 
