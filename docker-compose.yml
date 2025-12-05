@@ -28,7 +28,7 @@ services:
       - "8080:8080"
     volumes:
       - observer_data:/data:ro
-    command: sqlite_web -H 0.0.0.0 /data/observer.db
+    command: sqlite_web -H 0.0.0.0 -x /db /data/observer.db
 
 volumes:
   observer_data:
