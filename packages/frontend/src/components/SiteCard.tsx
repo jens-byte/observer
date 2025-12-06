@@ -18,7 +18,8 @@ export default function SiteCard(props: SiteCardProps) {
   const [isSaving, setIsSaving] = createSignal(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false)
   const [showEditModal, setShowEditModal] = createSignal(false)
-  const [canClosePopup, setCanClosePopup] = createSignal(false)
+  const [canCloseDelete, setCanCloseDelete] = createSignal(false)
+  const [canCloseEdit, setCanCloseEdit] = createSignal(false)
   const [copied, setCopied] = createSignal<string | null>(null)
 
   // Edit form state
@@ -27,13 +28,14 @@ export default function SiteCard(props: SiteCardProps) {
 
   const openDeleteConfirm = () => {
     setShowDeleteConfirm(true)
-    setCanClosePopup(false)
+    setCanCloseDelete(false)
     // Delay before backdrop can close the popup (prevents accidental close)
-    setTimeout(() => setCanClosePopup(true), 200)
+    setTimeout(() => setCanCloseDelete(true), 300)
   }
 
-  const closeDeleteConfirm = () => {
-    if (canClosePopup()) {
+  const closeDeleteConfirm = (e: MouseEvent) => {
+    e.stopPropagation()
+    if (canCloseDelete()) {
       setShowDeleteConfirm(false)
     }
   }
@@ -42,12 +44,13 @@ export default function SiteCard(props: SiteCardProps) {
     setEditName(props.site.name)
     setEditUrl(props.site.url)
     setShowEditModal(true)
-    setCanClosePopup(false)
-    setTimeout(() => setCanClosePopup(true), 200)
+    setCanCloseEdit(false)
+    setTimeout(() => setCanCloseEdit(true), 300)
   }
 
-  const closeEditModal = () => {
-    if (canClosePopup()) {
+  const closeEditModal = (e: MouseEvent) => {
+    e.stopPropagation()
+    if (canCloseEdit()) {
       setShowEditModal(false)
     }
   }
@@ -334,9 +337,9 @@ export default function SiteCard(props: SiteCardProps) {
 
       {/* Delete Confirmation Popup */}
       <Show when={showDeleteConfirm()}>
-        <div class="fixed inset-0 z-50 flex items-center justify-center">
-          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onMouseDown={closeDeleteConfirm} />
-          <div class="relative z-10 w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-6 shadow-2xl">
+        <div class="fixed inset-0 z-50 flex items-center justify-center" onMouseDown={closeDeleteConfirm}>
+          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div class="relative z-10 w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-6 shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
             <h3 class="text-lg font-semibold text-[var(--text)] mb-2">Delete Site</h3>
             <p class="text-sm text-[var(--text-secondary)] mb-6">
               Are you sure you want to delete <span class="font-medium text-[var(--text)]">{props.site.name}</span>? This action cannot be undone.
@@ -362,9 +365,9 @@ export default function SiteCard(props: SiteCardProps) {
 
       {/* Edit Modal */}
       <Show when={showEditModal()}>
-        <div class="fixed inset-0 z-50 flex items-center justify-center">
-          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onMouseDown={closeEditModal} />
-          <div class="relative z-10 w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-6 shadow-2xl">
+        <div class="fixed inset-0 z-50 flex items-center justify-center" onMouseDown={closeEditModal}>
+          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div class="relative z-10 w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-6 shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
             <h3 class="text-lg font-semibold text-[var(--text)] mb-4">Edit Site</h3>
             <form onSubmit={handleSave} class="space-y-4">
               <div>

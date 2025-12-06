@@ -220,19 +220,18 @@ export default function Dashboard() {
         await sites.check(auth.currentWorkspace.id, newSite.id)
         // Clear the slide-in animation before updating data
         setNewlyAddedSiteId(null)
-        // Fetch updated site data to show check results in the card
-        const updatedSites = await sites.list(auth.currentWorkspace.id)
-        // Update only this site's data while keeping it in Pending position
-        const updatedSite = updatedSites.find((s) => s.id === newSite.id)
-        if (updatedSite) {
-          setSiteList((prev) =>
-            prev.map((s) => (s.id === newSite.id ? { ...updatedSite, lastStatus: null } : s))
-          )
-        }
+        // Fetch only this site's updated data (not the whole list)
+        const updatedSite = await sites.get(auth.currentWorkspace.id, newSite.id)
+        // Update only this site in the list, keeping it in Pending position
+        setSiteList((prev) =>
+          prev.map((s) => (s.id === newSite.id ? { ...updatedSite, lastStatus: null } : s))
+        )
         // Keep the site on top for 3 seconds showing the check results
         await new Promise((resolve) => setTimeout(resolve, 3000))
-        // Move to the correct group
-        setSiteList(updatedSites)
+        // Now update with the real status to move it to the correct group
+        setSiteList((prev) =>
+          prev.map((s) => (s.id === newSite.id ? updatedSite : s))
+        )
       } catch {
         // Check failed, but site was still added - that's ok
         console.log('Initial check failed, will retry on next interval')
@@ -363,7 +362,7 @@ export default function Dashboard() {
             </button>
             <div class="h-5 w-px bg-[var(--border)]" />
             <span class="text-sm text-[var(--text-secondary)]">
-              {[auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(' ') || auth.user?.name}
+              {[auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(' ')}
             </span>
             <button
               onClick={handleLogout}

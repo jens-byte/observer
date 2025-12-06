@@ -174,6 +174,8 @@ workspaces.get('/:workspaceId/members', requireWorkspace('guest'), (c: any) => {
         id: schema.users.id,
         email: schema.users.email,
         name: schema.users.name,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
         avatarUrl: schema.users.avatarUrl,
         createdAt: schema.users.createdAt,
       },

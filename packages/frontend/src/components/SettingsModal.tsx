@@ -824,10 +824,10 @@ export default function SettingsModal(props: SettingsModalProps) {
                         <div class="flex items-center justify-between py-2">
                           <div class="flex items-center gap-3">
                             <div class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bg-tertiary)] text-xs font-medium text-[var(--text)]">
-                              {member.user?.name?.charAt(0).toUpperCase() || '?'}
+                              {member.user?.firstName?.charAt(0).toUpperCase() || member.user?.lastName?.charAt(0).toUpperCase() || '?'}
                             </div>
                             <div>
-                              <div class="text-sm text-[var(--text)]">{member.user?.name || 'Unknown'}</div>
+                              <div class="text-sm text-[var(--text)]">{[member.user?.firstName, member.user?.lastName].filter(Boolean).join(' ') || 'Unknown'}</div>
                               <div class="text-xs text-[var(--text-tertiary)]">{member.user?.email}</div>
                             </div>
                           </div>
