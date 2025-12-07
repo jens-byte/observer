@@ -22,7 +22,7 @@ export default function Dashboard() {
   const [error, setError] = createSignal('')
   const [search, setSearch] = createSignal('')
   const [filter, setFilter] = createSignal<FilterStatus>('all')
-  const [viewMode, setViewMode] = createSignal<ViewMode>('list')
+  const [viewMode, setViewMode] = createSignal<ViewMode>('switchboard')
   const [showAddSite, setShowAddSite] = createSignal(false)
   const [showSettings, setShowSettings] = createSignal(false)
   const [isFlashing, setIsFlashing] = createSignal(false)
@@ -283,23 +283,23 @@ export default function Dashboard() {
       </Show>
       {/* Header */}
       <header class="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg)]/80 backdrop-blur-xl transition-theme">
-        <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div class="flex items-center gap-6">
+        <div class="mx-auto flex max-w-6xl items-center justify-between px-3 py-2 sm:px-6 sm:py-4">
+          <div class="flex items-center gap-2 sm:gap-6">
             {/* Logo */}
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 sm:gap-3">
               <div class="relative">
-                <div class="h-8 w-8 rounded-full bg-[var(--text)]" />
+                <div class="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-[var(--text)]" />
                 <div class="absolute inset-0 flex items-center justify-center">
-                  <div class="h-3 w-3 rounded-full bg-[var(--bg)]" />
+                  <div class="h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-[var(--bg)]" />
                 </div>
               </div>
-              <span class="text-lg font-medium text-[var(--text)]">Observer</span>
+              <span class="hidden sm:inline text-lg font-medium text-[var(--text)]">Observer</span>
             </div>
             <WorkspaceSwitcher />
 
-            {/* Viewing indicators */}
+            {/* Viewing indicators - hidden on mobile */}
             <Show when={viewingUsers().length > 0}>
-              <div class="flex items-center gap-1">
+              <div class="hidden md:flex items-center gap-1">
                 <span class="text-xs text-[var(--text-tertiary)] mr-1">Also viewing:</span>
                 <div class="flex -space-x-2">
                   <For each={viewingUsers().slice(0, 5)}>
@@ -322,11 +322,11 @@ export default function Dashboard() {
             </Show>
           </div>
 
-          <div class="flex items-center gap-4">
+          <div class="flex items-center gap-1 sm:gap-4">
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
-              class="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
+              class="rounded-lg p-1.5 sm:p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
               title={theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               <Show when={theme() === 'dark'} fallback={
@@ -342,7 +342,7 @@ export default function Dashboard() {
             {/* Settings Button */}
             <button
               onClick={() => setShowSettings(true)}
-              class="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
+              class="rounded-lg p-1.5 sm:p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
               title="Settings"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -360,13 +360,22 @@ export default function Dashboard() {
                 />
               </svg>
             </button>
-            <div class="h-5 w-px bg-[var(--border)]" />
-            <span class="text-sm text-[var(--text-secondary)]">
+            <div class="hidden sm:block h-5 w-px bg-[var(--border)]" />
+            <span class="hidden sm:inline text-sm text-[var(--text-secondary)]">
               {[auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(' ')}
             </span>
             <button
               onClick={handleLogout}
-              class="rounded-full border border-[var(--border)] px-4 py-1.5 text-sm text-[var(--text)] transition-colors hover:bg-[var(--bg-hover)] hover:border-[var(--text-tertiary)]"
+              class="rounded-lg p-1.5 sm:hidden text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
+              title="Sign out"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+            <button
+              onClick={handleLogout}
+              class="hidden sm:inline-flex rounded-full border border-[var(--border)] px-4 py-1.5 text-sm text-[var(--text)] transition-colors hover:bg-[var(--bg-hover)] hover:border-[var(--text-tertiary)]"
             >
               Sign out
             </button>
@@ -375,67 +384,67 @@ export default function Dashboard() {
       </header>
 
       {/* Main Content */}
-      <main class="mx-auto max-w-6xl px-6 py-8">
-        {/* Stats Cards */}
-        <div class="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <main class="mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-8">
+        {/* Stats Cards - compact on mobile */}
+        <div class="mb-4 sm:mb-8 flex gap-2 overflow-x-auto pb-2 sm:grid sm:grid-cols-5 sm:gap-3 sm:overflow-visible sm:pb-0">
           <button
             onClick={() => setFilter('all')}
-            class={`group rounded-xl border p-4 text-left transition-all ${
+            class={`group flex-shrink-0 rounded-lg sm:rounded-xl border px-3 py-2 sm:p-4 text-left transition-all ${
               filter() === 'all'
                 ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Total</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().total}</div>
+            <div class="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Total</div>
+            <div class="text-lg sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().total}</div>
           </button>
 
           <button
             onClick={() => setFilter('up')}
-            class={`group rounded-xl border p-4 text-left transition-all ${
+            class={`group flex-shrink-0 rounded-lg sm:rounded-xl border px-3 py-2 sm:p-4 text-left transition-all ${
               filter() === 'up'
                 ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Up</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().up}</div>
+            <div class="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Up</div>
+            <div class="text-lg sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().up}</div>
           </button>
 
           <button
             onClick={() => setFilter('slow')}
-            class={`group rounded-xl border p-4 text-left transition-all ${
+            class={`group flex-shrink-0 rounded-lg sm:rounded-xl border px-3 py-2 sm:p-4 text-left transition-all ${
               filter() === 'slow'
                 ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Slow</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().slow}</div>
+            <div class="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Slow</div>
+            <div class="text-lg sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().slow}</div>
           </button>
 
           <button
             onClick={() => setFilter('down')}
-            class={`group rounded-xl border p-4 text-left transition-all ${
+            class={`group flex-shrink-0 rounded-lg sm:rounded-xl border px-3 py-2 sm:p-4 text-left transition-all ${
               filter() === 'down'
                 ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Down</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().down}</div>
+            <div class="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Down</div>
+            <div class="text-lg sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().down}</div>
           </button>
 
           <button
             onClick={() => setFilter('ssl')}
-            class={`group rounded-xl border p-4 text-left transition-all ${
+            class={`group flex-shrink-0 rounded-lg sm:rounded-xl border px-3 py-2 sm:p-4 text-left transition-all ${
               filter() === 'ssl'
                 ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">SSL</div>
-            <div class="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().sslWarnings}</div>
+            <div class="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">SSL</div>
+            <div class="text-lg sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().sslWarnings}</div>
           </button>
         </div>
 
@@ -457,19 +466,6 @@ export default function Dashboard() {
           {/* View Mode Toggle */}
           <div class="flex items-center rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] p-1">
             <button
-              onClick={() => setViewMode('list')}
-              class={`rounded-md px-3 py-1.5 text-sm transition-all ${
-                viewMode() === 'list'
-                  ? 'bg-[var(--bg-tertiary)] text-[var(--text)] shadow-sm'
-                  : 'text-[var(--text-tertiary)] hover:text-[var(--text)]'
-              }`}
-              title="List View"
-            >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-            <button
               onClick={() => setViewMode('switchboard')}
               class={`rounded-md px-3 py-1.5 text-sm transition-all ${
                 viewMode() === 'switchboard'
@@ -480,6 +476,19 @@ export default function Dashboard() {
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              class={`rounded-md px-3 py-1.5 text-sm transition-all ${
+                viewMode() === 'list'
+                  ? 'bg-[var(--bg-tertiary)] text-[var(--text)] shadow-sm'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text)]'
+              }`}
+              title="List View"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
           </div>
