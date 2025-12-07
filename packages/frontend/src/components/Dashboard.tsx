@@ -385,66 +385,66 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main class="mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-8">
-        {/* Stats Cards - compact on mobile */}
-        <div class="mb-4 sm:mb-8 flex gap-2 overflow-x-auto pb-2 sm:grid sm:grid-cols-5 sm:gap-3 sm:overflow-visible sm:pb-0">
+        {/* Stats Cards - equal width grid */}
+        <div class="mb-4 sm:mb-8 grid grid-cols-5 gap-1.5 sm:gap-3">
           <button
             onClick={() => setFilter('all')}
-            class={`group flex-shrink-0 rounded-lg sm:rounded-xl border px-3 py-2 sm:p-4 text-left transition-all ${
+            class={`group rounded-lg sm:rounded-xl border px-1.5 py-2 sm:p-4 text-center sm:text-left transition-all ${
               filter() === 'all'
                 ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Total</div>
-            <div class="text-lg sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().total}</div>
+            <div class="text-[9px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Total</div>
+            <div class="text-base sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().total}</div>
           </button>
 
           <button
             onClick={() => setFilter('up')}
-            class={`group flex-shrink-0 rounded-lg sm:rounded-xl border px-3 py-2 sm:p-4 text-left transition-all ${
+            class={`group rounded-lg sm:rounded-xl border px-1.5 py-2 sm:p-4 text-center sm:text-left transition-all ${
               filter() === 'up'
                 ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Up</div>
-            <div class="text-lg sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().up}</div>
+            <div class="text-[9px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Up</div>
+            <div class="text-base sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().up}</div>
           </button>
 
           <button
             onClick={() => setFilter('slow')}
-            class={`group flex-shrink-0 rounded-lg sm:rounded-xl border px-3 py-2 sm:p-4 text-left transition-all ${
+            class={`group rounded-lg sm:rounded-xl border px-1.5 py-2 sm:p-4 text-center sm:text-left transition-all ${
               filter() === 'slow'
                 ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Slow</div>
-            <div class="text-lg sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().slow}</div>
+            <div class="text-[9px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Slow</div>
+            <div class="text-base sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().slow}</div>
           </button>
 
           <button
             onClick={() => setFilter('down')}
-            class={`group flex-shrink-0 rounded-lg sm:rounded-xl border px-3 py-2 sm:p-4 text-left transition-all ${
+            class={`group rounded-lg sm:rounded-xl border px-1.5 py-2 sm:p-4 text-center sm:text-left transition-all ${
               filter() === 'down'
                 ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Down</div>
-            <div class="text-lg sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().down}</div>
+            <div class="text-[9px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Down</div>
+            <div class="text-base sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().down}</div>
           </button>
 
           <button
             onClick={() => setFilter('ssl')}
-            class={`group flex-shrink-0 rounded-lg sm:rounded-xl border px-3 py-2 sm:p-4 text-left transition-all ${
+            class={`group rounded-lg sm:rounded-xl border px-1.5 py-2 sm:p-4 text-center sm:text-left transition-all ${
               filter() === 'ssl'
                 ? 'border-[var(--border)] bg-[var(--bg-tertiary)]/50'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 hover:border-[var(--border)]'
             }`}
           >
-            <div class="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">SSL</div>
-            <div class="text-lg sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().sslWarnings}</div>
+            <div class="text-[9px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-tertiary)]">SSL</div>
+            <div class="text-base sm:text-2xl font-semibold tabular-nums text-[var(--text)]">{stats().sslWarnings}</div>
           </button>
         </div>
 
