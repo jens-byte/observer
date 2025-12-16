@@ -1,10 +1,11 @@
 import Foundation
 import SwiftUI
+import Combine
 
-@MainActor
 class AuthManager: ObservableObject {
     static let shared = AuthManager()
     
+    @Published var initialized = false
     @Published var isAuthenticated = false
     @Published var isLoading = true
     @Published var user: User?
@@ -15,13 +16,14 @@ class AuthManager: ObservableObject {
     private let workspaceIdKey = "currentWorkspaceId"
     
     private init() {
-        Task {
+        Task { @MainActor in
             await checkAuth()
         }
     }
     
     // MARK: - Public Methods
     
+    @MainActor
     func login(email: String, password: String) async {
         error = nil
         isLoading = true
@@ -41,8 +43,8 @@ class AuthManager: ObservableObject {
             if let workspace = currentWorkspace {
                 UserDefaults.standard.set(workspace.id, forKey: workspaceIdKey)
             }
-        } catch let apiError as APIError {
-            self.error = apiError.errorDescription
+        } catch let networkError as NetworkError {
+            self.error = networkError.errorDescription
         } catch {
             self.error = error.localizedDescription
         }
@@ -50,6 +52,7 @@ class AuthManager: ObservableObject {
         isLoading = false
     }
     
+    @MainActor
     func logout() async {
         do {
             try await APIClient.shared.requestVoid("/auth/logout", method: "POST")
@@ -72,6 +75,7 @@ class AuthManager: ObservableObject {
         }
     }
     
+    @MainActor
     func checkAuth() async {
         isLoading = true
         
@@ -94,8 +98,10 @@ class AuthManager: ObservableObject {
         }
         
         isLoading = false
+        initialized = true
     }
     
+    @MainActor
     func selectWorkspace(_ workspace: Workspace) {
         currentWorkspace = workspace
         UserDefaults.standard.set(workspace.id, forKey: workspaceIdKey)

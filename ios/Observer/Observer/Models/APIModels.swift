@@ -12,11 +12,6 @@ struct AuthResponse: Codable {
     let workspaces: [Workspace]
 }
 
-struct APIError: Codable {
-    let error: String
-    let message: String?
-}
-
 // MARK: - Dashboard Stats
 
 struct DashboardStats {

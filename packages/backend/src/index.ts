@@ -8,6 +8,7 @@ import './db/client'
 
 // Services
 import { startScheduler } from './services/monitor'
+import { startHeartbeat } from './services/heartbeat'
 
 // Routes
 import authRoutes from './routes/auth'
@@ -97,6 +98,9 @@ console.log(`🚀 Observer backend starting on port ${port}`)
 
 // Start monitoring scheduler (check every 60 seconds)
 startScheduler(60000)
+
+// Start heartbeat for self-monitoring (ping external service every 60 seconds)
+startHeartbeat(60000)
 
 // Start the server
 Bun.serve({

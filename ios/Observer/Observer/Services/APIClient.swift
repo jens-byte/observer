@@ -1,6 +1,6 @@
 import Foundation
 
-enum APIError: LocalizedError {
+enum NetworkError: LocalizedError {
     case invalidURL
     case invalidResponse
     case httpError(Int, String)
@@ -26,6 +26,12 @@ enum APIError: LocalizedError {
     }
 }
 
+// API error response from server
+struct ServerError: Codable {
+    let error: String
+    let message: String?
+}
+
 actor APIClient {
     static let shared = APIClient()
     
@@ -47,7 +53,7 @@ actor APIClient {
         body: (any Encodable)? = nil
     ) async throws -> T {
         guard let url = URL(string: baseURL + endpoint) else {
-            throw APIError.invalidURL
+            throw NetworkError.invalidURL
         }
         
         var request = URLRequest(url: url)
@@ -62,30 +68,30 @@ actor APIClient {
             let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw APIError.invalidResponse
+                throw NetworkError.invalidResponse
             }
             
             if httpResponse.statusCode == 401 {
-                throw APIError.unauthorized
+                throw NetworkError.unauthorized
             }
             
             if httpResponse.statusCode >= 400 {
-                if let apiError = try? JSONDecoder().decode(Models.APIError.self, from: data) {
-                    throw APIError.httpError(httpResponse.statusCode, apiError.error)
+                if let serverError = try? JSONDecoder().decode(ServerError.self, from: data) {
+                    throw NetworkError.httpError(httpResponse.statusCode, serverError.error)
                 }
-                throw APIError.httpError(httpResponse.statusCode, "Unknown error")
+                throw NetworkError.httpError(httpResponse.statusCode, "Unknown error")
             }
             
             let decoder = JSONDecoder()
             do {
                 return try decoder.decode(T.self, from: data)
             } catch {
-                throw APIError.decodingError(error)
+                throw NetworkError.decodingError(error)
             }
-        } catch let error as APIError {
+        } catch let error as NetworkError {
             throw error
         } catch {
-            throw APIError.networkError(error)
+            throw NetworkError.networkError(error)
         }
     }
     
@@ -95,7 +101,7 @@ actor APIClient {
         body: (any Encodable)? = nil
     ) async throws {
         guard let url = URL(string: baseURL + endpoint) else {
-            throw APIError.invalidURL
+            throw NetworkError.invalidURL
         }
         
         var request = URLRequest(url: url)
@@ -109,31 +115,18 @@ actor APIClient {
         let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
+            throw NetworkError.invalidResponse
         }
         
         if httpResponse.statusCode == 401 {
-            throw APIError.unauthorized
+            throw NetworkError.unauthorized
         }
         
         if httpResponse.statusCode >= 400 {
-            if let apiError = try? JSONDecoder().decode(Models.APIError.self, from: data) {
-                throw APIError.httpError(httpResponse.statusCode, apiError.error)
+            if let serverError = try? JSONDecoder().decode(ServerError.self, from: data) {
+                throw NetworkError.httpError(httpResponse.statusCode, serverError.error)
             }
-            throw APIError.httpError(httpResponse.statusCode, "Unknown error")
+            throw NetworkError.httpError(httpResponse.statusCode, "Unknown error")
         }
-    }
-}
-
-// Namespace for models to avoid conflicts
-enum Models {
-    typealias APIError = Observer.APIError
-}
-
-// Fix the APIError conflict
-extension Models {
-    struct APIError: Codable {
-        let error: String
-        let message: String?
     }
 }

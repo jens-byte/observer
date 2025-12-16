@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Combine
 
 @MainActor
 class DashboardViewModel: ObservableObject {
@@ -37,7 +38,6 @@ class DashboardViewModel: ObservableObject {
             filtered = sites.filter { ($0.sslDaysRemaining ?? 100) < 14 }
         }
         
-        // Sort: starred first, then by name
         return filtered.sorted { a, b in
             if a.isStarred != b.isStarred {
                 return a.isStarred
@@ -65,11 +65,11 @@ class DashboardViewModel: ObservableObject {
         do {
             let fetchedSites = try await SiteService.shared.listSites(workspaceId: workspaceId)
             self.sites = fetchedSites
-        } catch let apiError as APIError {
-            if case .unauthorized = apiError {
+        } catch let networkError as NetworkError {
+            if case .unauthorized = networkError {
                 await AuthManager.shared.logout()
             } else {
-                self.error = apiError.errorDescription
+                self.error = networkError.errorDescription
             }
         } catch {
             self.error = error.localizedDescription
@@ -82,7 +82,7 @@ class DashboardViewModel: ObservableObject {
         refreshTask?.cancel()
         refreshTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
                 if !Task.isCancelled {
                     await loadSites()
                 }
@@ -101,8 +101,8 @@ class DashboardViewModel: ObservableObject {
         do {
             try await SiteService.shared.deleteSite(workspaceId: workspaceId, siteId: site.id)
             sites.removeAll { $0.id == site.id }
-        } catch let apiError as APIError {
-            self.error = apiError.errorDescription
+        } catch let networkError as NetworkError {
+            self.error = networkError.errorDescription
         } catch {
             self.error = error.localizedDescription
         }
@@ -112,11 +112,8 @@ class DashboardViewModel: ObservableObject {
         guard let workspaceId = AuthManager.shared.currentWorkspace?.id else { return }
         
         do {
-            let isStarred = try await SiteService.shared.toggleStar(workspaceId: workspaceId, siteId: site.id)
-            if let index = sites.firstIndex(where: { $0.id == site.id }) {
-                // Create updated site (Site is immutable)
-                await loadSites() // Reload to get updated site
-            }
+            _ = try await SiteService.shared.toggleStar(workspaceId: workspaceId, siteId: site.id)
+            await loadSites()
         } catch {
             // Ignore star errors
         }
@@ -127,7 +124,6 @@ class DashboardViewModel: ObservableObject {
         
         do {
             try await SiteService.shared.checkSite(workspaceId: workspaceId, siteId: site.id)
-            // Wait a moment for the check to complete, then reload
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             await loadSites()
         } catch {

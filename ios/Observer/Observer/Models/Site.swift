@@ -39,12 +39,6 @@ struct Site: Codable, Identifiable {
         lastStatus ?? .unknown
     }
     
-    var statusColor: String {
-        if effectiveStatus == .down { return "red" }
-        if isSlow == true { return "orange" }
-        return "green"
-    }
-    
     var lastCheckedDate: Date? {
         guard let dateString = lastCheckedAt else { return nil }
         let formatter = ISO8601DateFormatter()

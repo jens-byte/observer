@@ -5,8 +5,6 @@ actor SiteService {
     
     private init() {}
     
-    // MARK: - Sites
-    
     func listSites(workspaceId: Int) async throws -> [Site] {
         try await APIClient.shared.request("/workspaces/\(workspaceId)/sites")
     }
