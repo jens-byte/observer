@@ -329,34 +329,14 @@ async function processBatches<T>(
 export async function checkAllSites() {
   const sites = db.select().from(schema.sites).where(eq(schema.sites.isActive, true)).all()
 
-  // Filter sites that are due for checking
-  const sitesToCheck = sites.filter((site) => {
-    const lastCheck = db
-      .select({ checkedAt: schema.checks.checkedAt })
-      .from(schema.checks)
-      .where(eq(schema.checks.siteId, site.id))
-      .orderBy(desc(schema.checks.checkedAt))
-      .limit(1)
-      .get()
-
-    if (lastCheck) {
-      const lastCheckTime = new Date(lastCheck.checkedAt).getTime()
-      const intervalMs = site.checkInterval * 60 * 1000
-      if (Date.now() - lastCheckTime < intervalMs) {
-        return false
-      }
-    }
-    return true
-  })
-
-  if (sitesToCheck.length > 0) {
-    console.log(`[Scheduler] Checking ${sitesToCheck.length} sites in batches of 5...`)
+  if (sites.length > 0) {
+    console.log(`[Scheduler] Checking ${sites.length} sites in batches of 10...`)
   }
 
-  // Process sites in batches of 5 with 500ms delay
+  // Process all sites in batches of 10 with 200ms delay between batches
   await processBatches(
-    sitesToCheck,
-    5,
+    sites,
+    10,
     async (site) => {
       try {
         await checkSite(site.id)
@@ -364,7 +344,7 @@ export async function checkAllSites() {
         console.error(`Error checking site ${site.name}:`, (error as Error).message)
       }
     },
-    500
+    200
   )
 }
 
