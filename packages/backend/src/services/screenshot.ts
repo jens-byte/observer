@@ -4,6 +4,24 @@ let browser: Browser | null = null
 let browserUseCount = 0
 const MAX_BROWSER_USES = 5
 
+// Simple mutex for browser operations
+let browserLock: Promise<void> = Promise.resolve()
+
+async function withBrowserLock<T>(fn: () => Promise<T>): Promise<T> {
+  const previousLock = browserLock
+  let releaseLock: () => void
+  browserLock = new Promise((resolve) => {
+    releaseLock = resolve
+  })
+
+  try {
+    await previousLock
+    return await fn()
+  } finally {
+    releaseLock!()
+  }
+}
+
 // Get or create browser instance (restart after MAX_BROWSER_USES to prevent memory leaks)
 async function getBrowser(): Promise<Browser> {
   if (browser && browserUseCount < MAX_BROWSER_USES) {
@@ -39,49 +57,51 @@ async function getBrowser(): Promise<Browser> {
 
 // Capture a screenshot of a URL
 export async function captureScreenshot(url: string): Promise<Buffer | null> {
-  let context: BrowserContext | null = null
+  return withBrowserLock(async () => {
+    let context: BrowserContext | null = null
 
-  try {
-    const browserInstance = await getBrowser()
+    try {
+      const browserInstance = await getBrowser()
 
-    context = await browserInstance.newContext({
-      viewport: { width: 1280, height: 800 },
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    })
+      context = await browserInstance.newContext({
+        viewport: { width: 1280, height: 800 },
+        userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      })
 
-    const page = await context.newPage()
+      const page = await context.newPage()
 
-    // Navigate with a timeout
-    await page.goto(url, {
-      waitUntil: 'networkidle',
-      timeout: 30000,
-    })
+      // Navigate with a timeout
+      await page.goto(url, {
+        waitUntil: 'networkidle',
+        timeout: 30000,
+      })
 
-    // Wait a bit for any animations to settle
-    await page.waitForTimeout(1000)
+      // Wait a bit for any animations to settle
+      await page.waitForTimeout(1000)
 
-    // Take screenshot
-    const screenshot = await page.screenshot({
-      type: 'png',
-      fullPage: false,
-    })
+      // Take screenshot
+      const screenshot = await page.screenshot({
+        type: 'png',
+        fullPage: false,
+      })
 
-    await context.close()
-    return Buffer.from(screenshot)
-  } catch (error) {
-    console.error('[Screenshot] Capture failed:', (error as Error).message)
+      await context.close()
+      return Buffer.from(screenshot)
+    } catch (error) {
+      console.error(`[Screenshot] Capture failed for ${url}:`, (error as Error).message)
 
-    if (context) {
-      try {
-        await context.close()
-      } catch (e) {
-        // Ignore close errors
+      if (context) {
+        try {
+          await context.close()
+        } catch (e) {
+          // Ignore close errors
+        }
       }
-    }
 
-    return null
-  }
+      return null
+    }
+  })
 }
 
 // Diagnose the problem based on error message and status code

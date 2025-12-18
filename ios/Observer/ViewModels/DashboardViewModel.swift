@@ -4,6 +4,8 @@ import Combine
 
 @MainActor
 class DashboardViewModel: ObservableObject {
+    var objectWillChange: ObservableObjectPublisher
+    
     @Published var sites: [Site] = []
     @Published var isLoading = false
     @Published var error: String?
@@ -38,6 +40,7 @@ class DashboardViewModel: ObservableObject {
             filtered = sites.filter { ($0.sslDaysRemaining ?? 100) < 14 }
         }
         
+        // Sort: starred first, then by name
         return filtered.sorted { a, b in
             if a.isStarred != b.isStarred {
                 return a.isStarred
@@ -82,7 +85,7 @@ class DashboardViewModel: ObservableObject {
         refreshTask?.cancel()
         refreshTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 30_000_000_000)
+                try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
                 if !Task.isCancelled {
                     await loadSites()
                 }
@@ -112,8 +115,11 @@ class DashboardViewModel: ObservableObject {
         guard let workspaceId = AuthManager.shared.currentWorkspace?.id else { return }
         
         do {
-            _ = try await SiteService.shared.toggleStar(workspaceId: workspaceId, siteId: site.id)
-            await loadSites()
+            let isStarred = try await SiteService.shared.toggleStar(workspaceId: workspaceId, siteId: site.id)
+            if let index = sites.firstIndex(where: { $0.id == site.id }) {
+                // Create updated site (Site is immutable)
+                await loadSites() // Reload to get updated site
+            }
         } catch {
             // Ignore star errors
         }
@@ -124,6 +130,7 @@ class DashboardViewModel: ObservableObject {
         
         do {
             try await SiteService.shared.checkSite(workspaceId: workspaceId, siteId: site.id)
+            // Wait a moment for the check to complete, then reload
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             await loadSites()
         } catch {

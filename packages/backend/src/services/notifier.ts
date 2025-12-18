@@ -289,13 +289,16 @@ export async function sendNotification(
     if (settings.slackBotToken && settings.slackChannelId) {
       // Use screenshot only if screenshotsEnabled is true
       const screenshot = settings.screenshotsEnabled ? screenshotBuffer : undefined
+      if (settings.screenshotsEnabled && !screenshotBuffer) {
+        console.log(`[Notifier] ${payload.siteName}: Screenshot was expected but not available (site unreachable)`)
+      }
       const success = await sendSlackBotMessage(
         settings.slackBotToken,
         settings.slackChannelId,
         payload,
         screenshot
       )
-      results.push(`Slack Bot: ${success ? 'sent' : 'failed'}`)
+      results.push(`Slack Bot: ${success ? 'sent' : 'failed'}${screenshot ? ' with screenshot' : ''}`)
     } else if (settings.webhookEnabled && settings.webhookUrl) {
       // Fallback to webhook only if bot isn't configured
       const success = await sendSlackWebhook(settings.webhookUrl, payload)
