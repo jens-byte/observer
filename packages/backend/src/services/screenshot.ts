@@ -61,6 +61,81 @@ async function getBrowser(): Promise<Browser> {
   return restartBrowser()
 }
 
+// Generate error page HTML
+function getErrorPageHtml(url: string, errorType: string): string {
+  const errorMessages: Record<string, { title: string; description: string }> = {
+    dns: {
+      title: "This site can't be reached",
+      description: "DNS lookup failed - the domain name could not be resolved.",
+    },
+    timeout: {
+      title: "This site can't be reached",
+      description: "The connection timed out - the server took too long to respond.",
+    },
+    refused: {
+      title: "This site can't be reached",
+      description: "Connection refused - the server is not accepting connections.",
+    },
+    default: {
+      title: "This site can't be reached",
+      description: "The site is unreachable or not responding.",
+    },
+  }
+
+  const error = errorMessages[errorType] || errorMessages.default
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+          background: #f5f5f5;
+          margin: 0;
+          padding: 60px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: calc(100vh - 120px);
+          color: #333;
+        }
+        .icon {
+          font-size: 64px;
+          margin-bottom: 24px;
+        }
+        h1 {
+          font-size: 24px;
+          font-weight: 500;
+          margin: 0 0 16px 0;
+        }
+        p {
+          font-size: 16px;
+          color: #666;
+          margin: 0 0 24px 0;
+          text-align: center;
+          max-width: 500px;
+        }
+        .url {
+          font-size: 14px;
+          color: #999;
+          word-break: break-all;
+          max-width: 600px;
+          text-align: center;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="icon">🚫</div>
+      <h1>${error.title}</h1>
+      <p>${error.description}</p>
+      <div class="url">${url}</div>
+    </body>
+    </html>
+  `
+}
+
 // Internal function to take screenshot (called by captureScreenshot with retry logic)
 async function takeScreenshot(url: string): Promise<Buffer> {
   const browserInstance = await getBrowser()
@@ -73,8 +148,10 @@ async function takeScreenshot(url: string): Promise<Buffer> {
 
   try {
     const page = await context.newPage()
+    let navigationFailed = false
+    let errorType = 'default'
 
-    // Try to navigate - if it fails, we'll still capture the browser's error page
+    // Try to navigate - if it fails, we'll render a custom error page
     try {
       await page.goto(url, {
         waitUntil: 'commit', // Faster - returns after response headers received
@@ -83,13 +160,34 @@ async function takeScreenshot(url: string): Promise<Buffer> {
       // Wait a bit for page content to render
       await page.waitForTimeout(1000)
     } catch (navigationError) {
-      // Navigation failed (connection refused, DNS error, timeout, etc.)
-      // The browser will show an error page - wait for it to render
-      console.log(`[Screenshot] Navigation failed for ${url}, capturing error page`)
-      await page.waitForTimeout(500)
+      navigationFailed = true
+      const errorMsg = (navigationError as Error).message.toLowerCase()
+
+      // Determine error type for custom error page
+      if (errorMsg.includes('enotfound') || errorMsg.includes('getaddrinfo') || errorMsg.includes('dns')) {
+        errorType = 'dns'
+      } else if (errorMsg.includes('timeout') || errorMsg.includes('etimedout')) {
+        errorType = 'timeout'
+      } else if (errorMsg.includes('econnrefused') || errorMsg.includes('refused')) {
+        errorType = 'refused'
+      }
+
+      console.log(`[Screenshot] Navigation failed for ${url} (${errorType}), rendering error page`)
     }
 
-    // Always take screenshot - either the actual page or the browser's error page
+    // Check if page is blank (headless Chromium issue with error pages)
+    // If navigation failed or page appears blank, render custom error page
+    if (navigationFailed) {
+      const bodyContent = await page.evaluate(() => document.body?.innerText?.trim() || '')
+
+      if (!bodyContent || bodyContent.length < 10) {
+        // Page is blank - render custom error page
+        await page.setContent(getErrorPageHtml(url, errorType))
+        await page.waitForTimeout(100)
+      }
+    }
+
+    // Take screenshot
     const screenshot = await page.screenshot({
       type: 'png',
       fullPage: false,
