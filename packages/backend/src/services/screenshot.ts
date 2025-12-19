@@ -55,7 +55,7 @@ async function getBrowser(): Promise<Browser> {
   return browser
 }
 
-// Capture a screenshot of a URL
+// Capture a screenshot of a URL (including browser error pages when site is down)
 export async function captureScreenshot(url: string): Promise<Buffer | null> {
   return withBrowserLock(async () => {
     let context: BrowserContext | null = null
@@ -71,16 +71,22 @@ export async function captureScreenshot(url: string): Promise<Buffer | null> {
 
       const page = await context.newPage()
 
-      // Navigate with a timeout
-      await page.goto(url, {
-        waitUntil: 'networkidle',
-        timeout: 30000,
-      })
+      // Try to navigate - if it fails, we'll still capture the browser's error page
+      try {
+        await page.goto(url, {
+          waitUntil: 'commit', // Faster - returns after response headers received
+          timeout: 15000,
+        })
+        // Wait a bit for page content to render
+        await page.waitForTimeout(1000)
+      } catch (navigationError) {
+        // Navigation failed (connection refused, DNS error, timeout, etc.)
+        // The browser will show an error page - wait for it to render
+        console.log(`[Screenshot] Navigation failed for ${url}, capturing error page`)
+        await page.waitForTimeout(500)
+      }
 
-      // Wait a bit for any animations to settle
-      await page.waitForTimeout(1000)
-
-      // Take screenshot
+      // Always take screenshot - either the actual page or the browser's error page
       const screenshot = await page.screenshot({
         type: 'png',
         fullPage: false,
@@ -89,6 +95,7 @@ export async function captureScreenshot(url: string): Promise<Buffer | null> {
       await context.close()
       return Buffer.from(screenshot)
     } catch (error) {
+      // Only fail if screenshot itself fails (not navigation)
       console.error(`[Screenshot] Capture failed for ${url}:`, (error as Error).message)
 
       if (context) {
