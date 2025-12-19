@@ -22,23 +22,17 @@ async function withBrowserLock<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-// Get or create browser instance (restart after MAX_BROWSER_USES to prevent memory leaks)
-async function getBrowser(): Promise<Browser> {
-  if (browser && browserUseCount < MAX_BROWSER_USES) {
-    browserUseCount++
-    return browser
-  }
-
-  // Close existing browser if it exists
+// Force restart browser (when it crashes or becomes unresponsive)
+async function restartBrowser(): Promise<Browser> {
   if (browser) {
     try {
       await browser.close()
     } catch (e) {
       // Ignore close errors
     }
+    browser = null
   }
 
-  // Launch new browser with memory-efficient settings
   browser = await chromium.launch({
     headless: true,
     args: [
@@ -55,57 +49,79 @@ async function getBrowser(): Promise<Browser> {
   return browser
 }
 
+// Get or create browser instance (restart after MAX_BROWSER_USES to prevent memory leaks)
+async function getBrowser(): Promise<Browser> {
+  // Check if existing browser is still alive
+  if (browser && browser.isConnected() && browserUseCount < MAX_BROWSER_USES) {
+    browserUseCount++
+    return browser
+  }
+
+  // Browser is dead or needs restart
+  return restartBrowser()
+}
+
+// Internal function to take screenshot (called by captureScreenshot with retry logic)
+async function takeScreenshot(url: string): Promise<Buffer> {
+  const browserInstance = await getBrowser()
+
+  const context = await browserInstance.newContext({
+    viewport: { width: 1280, height: 800 },
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  })
+
+  try {
+    const page = await context.newPage()
+
+    // Try to navigate - if it fails, we'll still capture the browser's error page
+    try {
+      await page.goto(url, {
+        waitUntil: 'commit', // Faster - returns after response headers received
+        timeout: 15000,
+      })
+      // Wait a bit for page content to render
+      await page.waitForTimeout(1000)
+    } catch (navigationError) {
+      // Navigation failed (connection refused, DNS error, timeout, etc.)
+      // The browser will show an error page - wait for it to render
+      console.log(`[Screenshot] Navigation failed for ${url}, capturing error page`)
+      await page.waitForTimeout(500)
+    }
+
+    // Always take screenshot - either the actual page or the browser's error page
+    const screenshot = await page.screenshot({
+      type: 'png',
+      fullPage: false,
+    })
+
+    return Buffer.from(screenshot)
+  } finally {
+    await context.close()
+  }
+}
+
 // Capture a screenshot of a URL (including browser error pages when site is down)
 export async function captureScreenshot(url: string): Promise<Buffer | null> {
   return withBrowserLock(async () => {
-    let context: BrowserContext | null = null
-
     try {
-      const browserInstance = await getBrowser()
-
-      context = await browserInstance.newContext({
-        viewport: { width: 1280, height: 800 },
-        userAgent:
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      })
-
-      const page = await context.newPage()
-
-      // Try to navigate - if it fails, we'll still capture the browser's error page
-      try {
-        await page.goto(url, {
-          waitUntil: 'commit', // Faster - returns after response headers received
-          timeout: 15000,
-        })
-        // Wait a bit for page content to render
-        await page.waitForTimeout(1000)
-      } catch (navigationError) {
-        // Navigation failed (connection refused, DNS error, timeout, etc.)
-        // The browser will show an error page - wait for it to render
-        console.log(`[Screenshot] Navigation failed for ${url}, capturing error page`)
-        await page.waitForTimeout(500)
-      }
-
-      // Always take screenshot - either the actual page or the browser's error page
-      const screenshot = await page.screenshot({
-        type: 'png',
-        fullPage: false,
-      })
-
-      await context.close()
-      return Buffer.from(screenshot)
+      return await takeScreenshot(url)
     } catch (error) {
-      // Only fail if screenshot itself fails (not navigation)
-      console.error(`[Screenshot] Capture failed for ${url}:`, (error as Error).message)
+      const errorMessage = (error as Error).message
 
-      if (context) {
+      // If browser crashed/closed, restart and retry once
+      if (errorMessage.includes('closed') || errorMessage.includes('crashed') || errorMessage.includes('Target')) {
+        console.log(`[Screenshot] Browser crashed for ${url}, restarting and retrying...`)
         try {
-          await context.close()
-        } catch (e) {
-          // Ignore close errors
+          await restartBrowser()
+          return await takeScreenshot(url)
+        } catch (retryError) {
+          console.error(`[Screenshot] Retry failed for ${url}:`, (retryError as Error).message)
+          return null
         }
       }
 
+      console.error(`[Screenshot] Capture failed for ${url}:`, errorMessage)
       return null
     }
   })
