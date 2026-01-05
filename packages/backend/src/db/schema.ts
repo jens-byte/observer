@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, unique } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, unique, index } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 
 // Users table
@@ -103,20 +103,27 @@ export const sites = sqliteTable('sites', {
 })
 
 // Checks table
-export const checks = sqliteTable('checks', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  siteId: integer('site_id')
-    .notNull()
-    .references(() => sites.id, { onDelete: 'cascade' }),
-  status: text('status').notNull(),
-  responseTime: integer('response_time'),
-  statusCode: integer('status_code'),
-  errorMessage: text('error_message'),
-  isSlow: integer('is_slow', { mode: 'boolean' }).notNull().default(false),
-  checkedAt: text('checked_at')
-    .notNull()
-    .default(sql`(datetime('now'))`),
-})
+export const checks = sqliteTable(
+  'checks',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    siteId: integer('site_id')
+      .notNull()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    status: text('status').notNull(),
+    responseTime: integer('response_time'),
+    statusCode: integer('status_code'),
+    errorMessage: text('error_message'),
+    isSlow: integer('is_slow', { mode: 'boolean' }).notNull().default(false),
+    checkedAt: text('checked_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [
+    index('checks_site_id_idx').on(table.siteId),
+    index('checks_site_checked_idx').on(table.siteId, table.checkedAt),
+  ]
+)
 
 // Settings table (per workspace)
 export const settings = sqliteTable('settings', {

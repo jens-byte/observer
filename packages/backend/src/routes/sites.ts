@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { db, schema } from '../db/client'
+import { db, schema, sqlite } from '../db/client'
 import { eq, and, desc, sql } from 'drizzle-orm'
 import { createSiteSchema, updateSiteSchema, reorderSitesSchema } from '@observer/shared'
 import type { SiteWithDetails } from '@observer/shared'
@@ -90,6 +90,7 @@ function getSiteWithDetails(siteId: number): SiteWithDetails | null {
 
 // List sites for workspace
 sites.get('/', requireWorkspace('guest'), (c: any) => {
+  const start = Date.now()
   const workspaceId = c.get('workspaceId')
 
   const allSites = db
@@ -98,6 +99,7 @@ sites.get('/', requireWorkspace('guest'), (c: any) => {
     .where(eq(schema.sites.workspaceId, workspaceId))
     .orderBy(desc(schema.sites.isStarred), schema.sites.sortOrder, desc(schema.sites.createdAt))
     .all()
+  console.log(`[Sites API] sites query: ${Date.now() - start}ms`)
 
   // Get all site IDs
   const siteIds = allSites.map((s) => s.id)
@@ -106,52 +108,54 @@ sites.get('/', requireWorkspace('guest'), (c: any) => {
   }
 
   // Batch load related data
+  const t1 = Date.now()
   const sslData = db.select().from(schema.sslInfo).all()
   const dnsData = db.select().from(schema.dnsInfo).all()
   const cmsData = db.select().from(schema.cmsInfo).all()
-
-  // Get last checks for is_slow
-  const lastChecks = db
-    .select()
-    .from(schema.checks)
-    .where(sql`id IN (SELECT MAX(id) FROM checks GROUP BY site_id)`)
-    .all()
-
-  // Get response histories
-  const responseHistories = db
-    .select({
-      siteId: schema.checks.siteId,
-      responseTime: schema.checks.responseTime,
-    })
-    .from(schema.checks)
-    .where(sql`${schema.checks.responseTime} IS NOT NULL`)
-    .orderBy(desc(schema.checks.checkedAt))
-    .all()
+  console.log(`[Sites API] ssl/dns/cms queries: ${Date.now() - t1}ms`)
 
   // Build lookup maps
   const sslMap = new Map(sslData.map((s) => [s.siteId, s]))
   const dnsMap = new Map(dnsData.map((d) => [d.siteId, d]))
   const cmsMap = new Map(cmsData.map((c) => [c.siteId, c]))
-  const lastCheckMap = new Map(lastChecks.map((c) => [c.siteId, c]))
 
-  // Group response histories by site (last 20)
+  // Get recent response times (last 30 minutes covers ~30 checks per site at 1/min)
+  const t2 = Date.now()
+  const siteIdList = siteIds.join(',')
+  const responseHistories = sqlite
+    .query<{ siteId: number; responseTime: number; checkedAt: string }, []>(`
+      SELECT site_id as siteId, response_time as responseTime, checked_at as checkedAt
+      FROM checks
+      WHERE site_id IN (${siteIdList})
+        AND response_time IS NOT NULL
+        AND checked_at >= datetime('now', '-30 minutes')
+      ORDER BY site_id, checked_at DESC
+    `)
+    .all()
+  console.log(`[Sites API] response history query: ${Date.now() - t2}ms, rows: ${responseHistories.length}`)
+
+  // Group by site and take last 20
   const responseHistoryMap = new Map<number, number[]>()
   for (const r of responseHistories) {
     if (!responseHistoryMap.has(r.siteId)) {
       responseHistoryMap.set(r.siteId, [])
     }
-    const history = responseHistoryMap.get(r.siteId)!
-    if (history.length < 20) {
-      history.push(r.responseTime!)
+    const arr = responseHistoryMap.get(r.siteId)!
+    if (arr.length < 20) {
+      arr.push(r.responseTime)
     }
   }
+  // Reverse to get chronological order
+  for (const [siteId, arr] of responseHistoryMap) {
+    responseHistoryMap.set(siteId, arr.reverse())
+  }
+  console.log(`[Sites API] total: ${Date.now() - start}ms`)
 
   // Build response
   const result: SiteWithDetails[] = allSites.map((site) => {
     const ssl = sslMap.get(site.id)
     const dns = dnsMap.get(site.id)
     const cms = cmsMap.get(site.id)
-    const lastCheck = lastCheckMap.get(site.id)
     const history = responseHistoryMap.get(site.id) || []
 
     return {
@@ -173,7 +177,7 @@ sites.get('/', requireWorkspace('guest'), (c: any) => {
       createdAt: site.createdAt,
       isSlow: site.cachedIsSlow,
       uptime: site.cachedUptime ? parseFloat(site.cachedUptime) : null,
-      responseHistory: history.reverse(),
+      responseHistory: history,
       sslDaysRemaining: ssl?.daysRemaining ?? null,
       sslValidTo: ssl?.validTo ?? null,
       nameservers: dns?.nameservers ?? null,

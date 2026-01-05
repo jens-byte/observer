@@ -18,5 +18,8 @@ sqlite.exec('PRAGMA journal_mode = WAL')
 // Create Drizzle instance
 export const db = drizzle(sqlite, { schema })
 
+// Export raw sqlite for complex queries
+export { sqlite }
+
 // Export schema for use in other files
 export { schema }
