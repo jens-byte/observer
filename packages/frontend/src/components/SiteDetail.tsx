@@ -25,6 +25,8 @@ export default function SiteDetail() {
   const [checks, setChecks] = createSignal<Check[]>([])
   const [isLoading, setIsLoading] = createSignal(true)
   const [error, setError] = createSignal('')
+  const [currentPage, setCurrentPage] = createSignal(1)
+  const itemsPerPage = 25
 
   const fetchData = async () => {
     if (!auth.currentWorkspace) return
@@ -127,6 +129,38 @@ export default function SiteDetail() {
 
   const handleBack = () => {
     navigate('/')
+  }
+
+  // Pagination
+  const totalPages = () => Math.ceil(checks().length / itemsPerPage)
+  const paginatedChecks = () => {
+    const start = (currentPage() - 1) * itemsPerPage
+    return checks().slice(start, start + itemsPerPage)
+  }
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages()) {
+      setCurrentPage(page)
+    }
+  }
+
+  const pageNumbers = () => {
+    const total = totalPages()
+    const current = currentPage()
+    const pages: (number | string)[] = []
+
+    if (total <= 7) {
+      for (let i = 1; i <= total; i++) pages.push(i)
+    } else {
+      pages.push(1)
+      if (current > 3) pages.push('...')
+      for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+        pages.push(i)
+      }
+      if (current < total - 2) pages.push('...')
+      pages.push(total)
+    }
+    return pages
   }
 
   return (
@@ -325,7 +359,7 @@ export default function SiteDetail() {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-[var(--border)]">
-                  <For each={checks()}>
+                  <For each={paginatedChecks()}>
                     {(check) => (
                       <tr class="hover:bg-[var(--bg-hover)] transition-colors">
                         <td class="px-6 py-3 whitespace-nowrap">
@@ -352,6 +386,49 @@ export default function SiteDetail() {
             </div>
             <Show when={checks().length === 0 && !isLoading()}>
               <div class="text-center py-8 text-[var(--text-tertiary)]">No check history available</div>
+            </Show>
+
+            {/* Pagination */}
+            <Show when={totalPages() > 1}>
+              <div class="px-6 py-4 border-t border-[var(--border)] flex items-center justify-between">
+                <div class="text-sm text-[var(--text-tertiary)]">
+                  Showing {((currentPage() - 1) * itemsPerPage) + 1} to {Math.min(currentPage() * itemsPerPage, checks().length)} of {checks().length} checks
+                </div>
+                <div class="flex items-center gap-1">
+                  <button
+                    onClick={() => goToPage(currentPage() - 1)}
+                    disabled={currentPage() === 1}
+                    class="px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] text-[var(--text)] hover:bg-[var(--bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <For each={pageNumbers()}>
+                    {(page) => (
+                      <Show when={typeof page === 'number'} fallback={
+                        <span class="px-2 text-[var(--text-tertiary)]">...</span>
+                      }>
+                        <button
+                          onClick={() => goToPage(page as number)}
+                          class={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                            currentPage() === page
+                              ? 'border-[var(--text)] bg-[var(--text)] text-[var(--bg)] font-medium'
+                              : 'border-[var(--border)] text-[var(--text)] hover:bg-[var(--bg-hover)]'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </Show>
+                    )}
+                  </For>
+                  <button
+                    onClick={() => goToPage(currentPage() + 1)}
+                    disabled={currentPage() === totalPages()}
+                    class="px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] text-[var(--text)] hover:bg-[var(--bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </Show>
           </div>
         </Show>
