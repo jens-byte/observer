@@ -1,4 +1,5 @@
 import { createSignal, Show } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import type { SiteWithDetails, WorkspaceRole } from '@observer/shared'
 import { sites } from '../lib/api'
 import Sparkline from './Sparkline'
@@ -12,6 +13,7 @@ interface SiteCardProps {
 }
 
 export default function SiteCard(props: SiteCardProps) {
+  const navigate = useNavigate()
   const [isChecking, setIsChecking] = createSignal(false)
   const [isSimulating, setIsSimulating] = createSignal(false)
   const [isDeleting, setIsDeleting] = createSignal(false)
@@ -21,6 +23,11 @@ export default function SiteCard(props: SiteCardProps) {
   const [canCloseDelete, setCanCloseDelete] = createSignal(false)
   const [canCloseEdit, setCanCloseEdit] = createSignal(false)
   const [copied, setCopied] = createSignal<string | null>(null)
+
+  const handleHistory = (e: Event) => {
+    e.stopPropagation()
+    navigate(`/sites/${props.site.id}`)
+  }
 
   // Edit form state
   const [editName, setEditName] = createSignal('')
@@ -318,6 +325,12 @@ export default function SiteCard(props: SiteCardProps) {
             class="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--text)] hover:bg-[var(--bg-hover)] hover:border-[var(--text-tertiary)]"
           >
             Edit
+          </button>
+          <button
+            onClick={handleHistory}
+            class="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--text)] hover:bg-[var(--bg-hover)] hover:border-[var(--text-tertiary)]"
+          >
+            History
           </button>
           <button
             onClick={handleSimulateDown}

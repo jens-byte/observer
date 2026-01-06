@@ -1,4 +1,5 @@
 import { createSignal, createEffect, Show, For, onCleanup } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import type { SiteWithDetails, DashboardStats, SseCheckEvent, PresenceUser } from '@observer/shared'
 import { useAuth } from '../lib/auth'
 import { useTheme } from '../lib/theme'
@@ -16,6 +17,7 @@ const lastKnownStatus = new Map<number, string>()
 
 export default function Dashboard() {
   const auth = useAuth()
+  const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
   const [siteList, setSiteList] = createSignal<SiteWithDetails[]>([])
   const [isLoading, setIsLoading] = createSignal(true)
@@ -259,10 +261,15 @@ export default function Dashboard() {
 
     const isAlert = props.site.lastStatus === 'down' || props.site.isSlow
 
+    const handleClick = () => {
+      navigate(`/sites/${props.site.id}`)
+    }
+
     return (
       <div
-        class="flex items-center gap-1.5 py-0.5 cursor-default"
+        class="flex items-center gap-1.5 py-0.5 cursor-pointer hover:bg-[var(--bg-hover)] rounded px-1 -mx-1 transition-colors"
         title={`${props.site.url}${props.site.lastResponseTime ? ' • ' + props.site.lastResponseTime + 'ms' : ''}`}
+        onClick={handleClick}
       >
         <div class="relative flex-shrink-0">
           <div class={`h-2 w-2 rounded-full ${getStatusColor()}`} />
@@ -270,7 +277,7 @@ export default function Dashboard() {
             <div class={`absolute inset-0 h-2 w-2 rounded-full ${getStatusColor()} animate-ping opacity-75`} />
           </Show>
         </div>
-        <span class="text-xs text-[var(--text-secondary)] truncate">{props.site.name}</span>
+        <span class="text-xs text-[var(--text-secondary)] truncate hover:text-[var(--text)]">{props.site.name}</span>
       </div>
     )
   }

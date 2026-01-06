@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
+import SiteDetail from './components/SiteDetail'
 import InviteAccept from './components/InviteAccept'
 import WorkspaceRedirect from './components/WorkspaceRedirect'
 
@@ -83,6 +84,14 @@ function ProtectedDashboard() {
   )
 }
 
+function ProtectedSiteDetail() {
+  return (
+    <ProtectedRoute>
+      <SiteDetail />
+    </ProtectedRoute>
+  )
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -96,6 +105,7 @@ export default function App() {
         <Route path="/login" component={ProtectedLogin} />
         <Route path="/invite/:token" component={InviteAccept} />
         <Route path="/" component={ProtectedDashboard} />
+        <Route path="/sites/:siteId" component={ProtectedSiteDetail} />
         <Route path="/:slug" component={WorkspaceRedirect} />
       </Router>
     </ThemeProvider>

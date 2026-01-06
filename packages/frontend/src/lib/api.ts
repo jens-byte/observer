@@ -127,6 +127,18 @@ export const sites = {
     fetchApi<{ status: string }>(`/workspaces/${workspaceId}/sites/${siteId}/simulate-down`, {
       method: 'POST',
     }),
+
+  getChecks: (workspaceId: number, siteId: number, limit = 100) =>
+    fetchApi<Array<{
+      id: number
+      siteId: number
+      status: string
+      responseTime: number | null
+      statusCode: number | null
+      errorMessage: string | null
+      isSlow: boolean
+      checkedAt: string
+    }>>(`/workspaces/${workspaceId}/sites/${siteId}/checks?limit=${limit}`),
 }
 
 // Settings
