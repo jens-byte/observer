@@ -26,6 +26,8 @@ export default function SiteDetail() {
   const [isLoading, setIsLoading] = createSignal(true)
   const [error, setError] = createSignal('')
   const [currentPage, setCurrentPage] = createSignal(1)
+  const [dateFrom, setDateFrom] = createSignal('')
+  const [dateTo, setDateTo] = createSignal('')
   const itemsPerPage = 25
 
   const fetchData = async () => {
@@ -131,11 +133,35 @@ export default function SiteDetail() {
     navigate('/')
   }
 
+  // Filtered checks by date range
+  const filteredChecks = () => {
+    let result = checks()
+
+    if (dateFrom()) {
+      const fromDate = new Date(dateFrom())
+      result = result.filter(c => new Date(c.checkedAt) >= fromDate)
+    }
+
+    if (dateTo()) {
+      const toDate = new Date(dateTo())
+      toDate.setHours(23, 59, 59, 999) // Include the entire end day
+      result = result.filter(c => new Date(c.checkedAt) <= toDate)
+    }
+
+    return result
+  }
+
   // Pagination
-  const totalPages = () => Math.ceil(checks().length / itemsPerPage)
+  const totalPages = () => Math.ceil(filteredChecks().length / itemsPerPage)
   const paginatedChecks = () => {
     const start = (currentPage() - 1) * itemsPerPage
-    return checks().slice(start, start + itemsPerPage)
+    return filteredChecks().slice(start, start + itemsPerPage)
+  }
+
+  const clearFilters = () => {
+    setDateFrom('')
+    setDateTo('')
+    setCurrentPage(1)
   }
 
   const goToPage = (page: number) => {
@@ -345,7 +371,37 @@ export default function SiteDetail() {
           {/* Check History Table */}
           <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]/50 overflow-hidden">
             <div class="px-6 py-4 border-b border-[var(--border)]">
-              <h2 class="text-lg font-medium text-[var(--text)]">Check History</h2>
+              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <h2 class="text-lg font-medium text-[var(--text)]">Check History</h2>
+                <div class="flex flex-wrap items-center gap-3">
+                  <div class="flex items-center gap-2">
+                    <label class="text-xs text-[var(--text-tertiary)]">From</label>
+                    <input
+                      type="datetime-local"
+                      value={dateFrom()}
+                      onInput={(e) => { setDateFrom(e.currentTarget.value); setCurrentPage(1) }}
+                      class="rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+                    />
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <label class="text-xs text-[var(--text-tertiary)]">To</label>
+                    <input
+                      type="datetime-local"
+                      value={dateTo()}
+                      onInput={(e) => { setDateTo(e.currentTarget.value); setCurrentPage(1) }}
+                      class="rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+                    />
+                  </div>
+                  <Show when={dateFrom() || dateTo()}>
+                    <button
+                      onClick={clearFilters}
+                      class="text-xs text-[var(--text-tertiary)] hover:text-[var(--text)] underline"
+                    >
+                      Clear
+                    </button>
+                  </Show>
+                </div>
+              </div>
             </div>
             <div class="overflow-x-auto">
               <table class="w-full">
@@ -384,15 +440,18 @@ export default function SiteDetail() {
                 </tbody>
               </table>
             </div>
-            <Show when={checks().length === 0 && !isLoading()}>
-              <div class="text-center py-8 text-[var(--text-tertiary)]">No check history available</div>
+            <Show when={filteredChecks().length === 0 && !isLoading()}>
+              <div class="text-center py-8 text-[var(--text-tertiary)]">
+                {checks().length === 0 ? 'No check history available' : 'No checks match the selected date range'}
+              </div>
             </Show>
 
             {/* Pagination */}
             <Show when={totalPages() > 1}>
               <div class="px-6 py-4 border-t border-[var(--border)] flex items-center justify-between">
                 <div class="text-sm text-[var(--text-tertiary)]">
-                  Showing {((currentPage() - 1) * itemsPerPage) + 1} to {Math.min(currentPage() * itemsPerPage, checks().length)} of {checks().length} checks
+                  Showing {((currentPage() - 1) * itemsPerPage) + 1} to {Math.min(currentPage() * itemsPerPage, filteredChecks().length)} of {filteredChecks().length} checks
+                  {(dateFrom() || dateTo()) && ` (filtered from ${checks().length})`}
                 </div>
                 <div class="flex items-center gap-1">
                   <button
