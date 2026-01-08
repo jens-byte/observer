@@ -19,10 +19,21 @@ export function startHeartbeat(intervalMs: number) {
   setInterval(() => sendPing(url), intervalMs)
 }
 
-async function sendPing(url: string) {
-  try {
-    await fetch(url, { method: 'HEAD' })
-  } catch (error) {
-    console.error('Heartbeat ping failed:', error)
+async function sendPing(url: string, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+      await fetch(url, { method: 'HEAD', signal: controller.signal })
+      clearTimeout(timeoutId)
+      return // Success
+    } catch (error) {
+      if (attempt === retries) {
+        console.error(`Heartbeat ping failed after ${retries} attempts:`, (error as Error).message)
+      } else {
+        // Wait 5 seconds before retry
+        await new Promise(resolve => setTimeout(resolve, 5000))
+      }
+    }
   }
 }
