@@ -350,6 +350,7 @@ export async function checkAllSites() {
 
 // Start scheduler
 let schedulerInterval: Timer | null = null
+let isCheckingInProgress = false
 
 export function startScheduler(intervalMs = 60000) {
   if (schedulerInterval) {
@@ -359,12 +360,40 @@ export function startScheduler(intervalMs = 60000) {
   console.log(`[Scheduler] Starting with ${intervalMs}ms interval`)
 
   // Run immediately
-  checkAllSites().catch(console.error)
+  runScheduledCheck()
 
   // Then run on interval
   schedulerInterval = setInterval(() => {
-    checkAllSites().catch(console.error)
+    runScheduledCheck()
   }, intervalMs)
+}
+
+async function runScheduledCheck() {
+  // Prevent overlapping check cycles
+  if (isCheckingInProgress) {
+    console.log('[Scheduler] Previous check cycle still running, skipping...')
+    return
+  }
+
+  isCheckingInProgress = true
+  const startTime = Date.now()
+
+  try {
+    // Add overall timeout for the check cycle (5 minutes max)
+    const CHECK_CYCLE_TIMEOUT = 5 * 60 * 1000
+    await Promise.race([
+      checkAllSites(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Check cycle timeout')), CHECK_CYCLE_TIMEOUT)
+      ),
+    ])
+  } catch (error) {
+    console.error('[Scheduler] Check cycle error:', (error as Error).message)
+  } finally {
+    isCheckingInProgress = false
+    const duration = Math.round((Date.now() - startTime) / 1000)
+    console.log(`[Scheduler] Check cycle completed in ${duration}s`)
+  }
 }
 
 export function stopScheduler() {

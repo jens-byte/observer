@@ -199,30 +199,62 @@ async function takeScreenshot(url: string): Promise<Buffer> {
   }
 }
 
+// Timeout wrapper to prevent Playwright from hanging indefinitely
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  let timeoutId: Timer
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+  })
+
+  try {
+    return await Promise.race([promise, timeoutPromise])
+  } finally {
+    clearTimeout(timeoutId!)
+  }
+}
+
 // Capture a screenshot of a URL (including browser error pages when site is down)
 export async function captureScreenshot(url: string): Promise<Buffer | null> {
-  return withBrowserLock(async () => {
-    try {
-      return await takeScreenshot(url)
-    } catch (error) {
-      const errorMessage = (error as Error).message
+  // Overall timeout of 30 seconds for the entire screenshot operation
+  const SCREENSHOT_TIMEOUT = 30000
 
-      // If browser crashed/closed, restart and retry once
-      if (errorMessage.includes('closed') || errorMessage.includes('crashed') || errorMessage.includes('Target')) {
-        console.log(`[Screenshot] Browser crashed for ${url}, restarting and retrying...`)
+  try {
+    return await withTimeout(
+      withBrowserLock(async () => {
         try {
-          await restartBrowser()
           return await takeScreenshot(url)
-        } catch (retryError) {
-          console.error(`[Screenshot] Retry failed for ${url}:`, (retryError as Error).message)
+        } catch (error) {
+          const errorMessage = (error as Error).message
+
+          // If browser crashed/closed, restart and retry once
+          if (errorMessage.includes('closed') || errorMessage.includes('crashed') || errorMessage.includes('Target')) {
+            console.log(`[Screenshot] Browser crashed for ${url}, restarting and retrying...`)
+            try {
+              await restartBrowser()
+              return await takeScreenshot(url)
+            } catch (retryError) {
+              console.error(`[Screenshot] Retry failed for ${url}:`, (retryError as Error).message)
+              return null
+            }
+          }
+
+          console.error(`[Screenshot] Capture failed for ${url}:`, errorMessage)
           return null
         }
-      }
-
-      console.error(`[Screenshot] Capture failed for ${url}:`, errorMessage)
-      return null
+      }),
+      SCREENSHOT_TIMEOUT,
+      `Screenshot timeout after ${SCREENSHOT_TIMEOUT}ms`
+    )
+  } catch (error) {
+    console.error(`[Screenshot] Timeout for ${url}:`, (error as Error).message)
+    // Force restart browser on timeout to recover from hung state
+    try {
+      await restartBrowser()
+    } catch {
+      // Ignore restart errors
     }
-  })
+    return null
+  }
 }
 
 // Diagnose the problem based on error message and status code
