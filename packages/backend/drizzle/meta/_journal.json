@@ -22,6 +22,20 @@
       "when": 1764956371998,
       "tag": "0002_slimy_ares",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1768473173621,
+      "tag": "0003_giant_doctor_faustus",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1768994804491,
+      "tag": "0004_serious_manta",
+      "breakpoints": true
     }
   ]
 }

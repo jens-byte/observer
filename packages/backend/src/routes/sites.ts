@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { db, schema, sqlite } from '../db/client'
-import { eq, and, desc, sql } from 'drizzle-orm'
+import { eq, and, desc, sql, inArray } from 'drizzle-orm'
 import { createSiteSchema, updateSiteSchema, reorderSitesSchema } from '@observer/shared'
 import type { SiteWithDetails } from '@observer/shared'
 import { requireWorkspace, type WorkspaceContext } from '../middleware/auth'
@@ -24,15 +24,6 @@ function getSiteWithDetails(siteId: number): SiteWithDetails | null {
   // Get CMS info
   const cms = db.select().from(schema.cmsInfo).where(eq(schema.cmsInfo.siteId, siteId)).get()
 
-  // Get last check for is_slow
-  const lastCheck = db
-    .select()
-    .from(schema.checks)
-    .where(eq(schema.checks.siteId, siteId))
-    .orderBy(desc(schema.checks.checkedAt))
-    .limit(1)
-    .get()
-
   // Get response history (last 20)
   const recentChecks = db
     .select({ responseTime: schema.checks.responseTime })
@@ -43,21 +34,6 @@ function getSiteWithDetails(siteId: number): SiteWithDetails | null {
     .all()
 
   const responseHistory = recentChecks.map((c) => c.responseTime!).reverse()
-
-  // Calculate uptime (last 30 days)
-  const uptimeStats = db
-    .select({
-      total: sql<number>`COUNT(*)`,
-      upCount: sql<number>`SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END)`,
-    })
-    .from(schema.checks)
-    .where(and(eq(schema.checks.siteId, siteId), sql`checked_at >= datetime('now', '-30 days')`))
-    .get()
-
-  const uptime =
-    uptimeStats && uptimeStats.total > 0
-      ? Number(((uptimeStats.upCount / uptimeStats.total) * 100).toFixed(2))
-      : null
 
   return {
     id: site.id,
@@ -76,8 +52,8 @@ function getSiteWithDetails(siteId: number): SiteWithDetails | null {
     confirmedDownAt: site.confirmedDownAt,
     downNotified: site.downNotified,
     createdAt: site.createdAt,
-    isSlow: lastCheck?.isSlow ?? false,
-    uptime,
+    isSlow: site.cachedIsSlow,
+    uptime: site.cachedUptime ? parseFloat(site.cachedUptime) : null,
     responseHistory,
     sslDaysRemaining: ssl?.daysRemaining ?? null,
     sslValidTo: ssl?.validTo ?? null,
@@ -107,11 +83,11 @@ sites.get('/', requireWorkspace('guest'), (c: any) => {
     return c.json([])
   }
 
-  // Batch load related data
+  // Batch load related data for this workspace's sites only
   const t1 = Date.now()
-  const sslData = db.select().from(schema.sslInfo).all()
-  const dnsData = db.select().from(schema.dnsInfo).all()
-  const cmsData = db.select().from(schema.cmsInfo).all()
+  const sslData = db.select().from(schema.sslInfo).where(inArray(schema.sslInfo.siteId, siteIds)).all()
+  const dnsData = db.select().from(schema.dnsInfo).where(inArray(schema.dnsInfo.siteId, siteIds)).all()
+  const cmsData = db.select().from(schema.cmsInfo).where(inArray(schema.cmsInfo.siteId, siteIds)).all()
   console.log(`[Sites API] ssl/dns/cms queries: ${Date.now() - t1}ms`)
 
   // Build lookup maps
@@ -119,35 +95,34 @@ sites.get('/', requireWorkspace('guest'), (c: any) => {
   const dnsMap = new Map(dnsData.map((d) => [d.siteId, d]))
   const cmsMap = new Map(cmsData.map((c) => [c.siteId, c]))
 
-  // Get recent response times (last 30 minutes covers ~30 checks per site at 1/min)
+  // Get recent response times (last 20 per site, ordered chronologically)
   const t2 = Date.now()
   const siteIdList = siteIds.join(',')
+  // Order by ASC so we get chronological order directly, avoiding reverse()
   const responseHistories = sqlite
-    .query<{ siteId: number; responseTime: number; checkedAt: string }, []>(`
-      SELECT site_id as siteId, response_time as responseTime, checked_at as checkedAt
-      FROM checks
-      WHERE site_id IN (${siteIdList})
-        AND response_time IS NOT NULL
-        AND checked_at >= datetime('now', '-30 minutes')
-      ORDER BY site_id, checked_at DESC
+    .query<{ siteId: number; responseTime: number }, []>(`
+      SELECT site_id as siteId, response_time as responseTime
+      FROM (
+        SELECT site_id, response_time, checked_at,
+               ROW_NUMBER() OVER (PARTITION BY site_id ORDER BY checked_at DESC) as rn
+        FROM checks
+        WHERE site_id IN (${siteIdList})
+          AND response_time IS NOT NULL
+          AND checked_at >= datetime('now', '-30 minutes')
+      )
+      WHERE rn <= 20
+      ORDER BY site_id, checked_at ASC
     `)
     .all()
   console.log(`[Sites API] response history query: ${Date.now() - t2}ms, rows: ${responseHistories.length}`)
 
-  // Group by site and take last 20
+  // Group by site (already in chronological order)
   const responseHistoryMap = new Map<number, number[]>()
   for (const r of responseHistories) {
     if (!responseHistoryMap.has(r.siteId)) {
       responseHistoryMap.set(r.siteId, [])
     }
-    const arr = responseHistoryMap.get(r.siteId)!
-    if (arr.length < 20) {
-      arr.push(r.responseTime)
-    }
-  }
-  // Reverse to get chronological order
-  for (const [siteId, arr] of responseHistoryMap) {
-    responseHistoryMap.set(siteId, arr.reverse())
+    responseHistoryMap.get(r.siteId)!.push(r.responseTime)
   }
   console.log(`[Sites API] total: ${Date.now() - start}ms`)
 

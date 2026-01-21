@@ -73,34 +73,38 @@ export const workspaceInvites = sqliteTable('workspace_invites', {
 })
 
 // Sites table
-export const sites = sqliteTable('sites', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  workspaceId: integer('workspace_id')
-    .notNull()
-    .references(() => workspaces.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  url: text('url').notNull(),
-  checkInterval: integer('check_interval').notNull().default(5),
-  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-  isStarred: integer('is_starred', { mode: 'boolean' }).notNull().default(false),
-  isSla: integer('is_sla', { mode: 'boolean' }).notNull().default(false),
-  sortOrder: integer('sort_order').notNull().default(0),
-  license: text('license'),
-  widgetToken: text('widget_token'),
-  // Cached values for fast queries
-  lastStatus: text('last_status'),
-  lastResponseTime: integer('last_response_time'),
-  lastCheckedAt: text('last_checked_at'),
-  cachedIsSlow: integer('cached_is_slow', { mode: 'boolean' }).notNull().default(false),
-  cachedUptime: text('cached_uptime'),
-  // Down tracking
-  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
-  confirmedDownAt: text('confirmed_down_at'),
-  downNotified: integer('down_notified', { mode: 'boolean' }).notNull().default(false),
-  createdAt: text('created_at')
-    .notNull()
-    .default(sql`(datetime('now'))`),
-})
+export const sites = sqliteTable(
+  'sites',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    workspaceId: integer('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    url: text('url').notNull(),
+    checkInterval: integer('check_interval').notNull().default(5),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    isStarred: integer('is_starred', { mode: 'boolean' }).notNull().default(false),
+    isSla: integer('is_sla', { mode: 'boolean' }).notNull().default(false),
+    sortOrder: integer('sort_order').notNull().default(0),
+    license: text('license'),
+    widgetToken: text('widget_token'),
+    // Cached values for fast queries
+    lastStatus: text('last_status'),
+    lastResponseTime: integer('last_response_time'),
+    lastCheckedAt: text('last_checked_at'),
+    cachedIsSlow: integer('cached_is_slow', { mode: 'boolean' }).notNull().default(false),
+    cachedUptime: text('cached_uptime'),
+    // Down tracking
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    confirmedDownAt: text('confirmed_down_at'),
+    downNotified: integer('down_notified', { mode: 'boolean' }).notNull().default(false),
+    createdAt: text('created_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [index('sites_workspace_id_idx').on(table.workspaceId)]
+)
 
 // Checks table
 export const checks = sqliteTable(
@@ -122,6 +126,7 @@ export const checks = sqliteTable(
   (table) => [
     index('checks_site_id_idx').on(table.siteId),
     index('checks_site_checked_idx').on(table.siteId, table.checkedAt),
+    index('checks_checked_at_idx').on(table.checkedAt),
   ]
 )
 
@@ -149,45 +154,57 @@ export const settings = sqliteTable('settings', {
 })
 
 // SSL info table
-export const sslInfo = sqliteTable('ssl_info', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  siteId: integer('site_id')
-    .notNull()
-    .unique()
-    .references(() => sites.id, { onDelete: 'cascade' }),
-  issuer: text('issuer'),
-  validFrom: text('valid_from'),
-  validTo: text('valid_to'),
-  daysRemaining: integer('days_remaining'),
-  lastChecked: text('last_checked')
-    .notNull()
-    .default(sql`(datetime('now'))`),
-})
+export const sslInfo = sqliteTable(
+  'ssl_info',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    siteId: integer('site_id')
+      .notNull()
+      .unique()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    issuer: text('issuer'),
+    validFrom: text('valid_from'),
+    validTo: text('valid_to'),
+    daysRemaining: integer('days_remaining'),
+    lastChecked: text('last_checked')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [index('ssl_info_site_id_idx').on(table.siteId)]
+)
 
 // DNS info table
-export const dnsInfo = sqliteTable('dns_info', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  siteId: integer('site_id')
-    .notNull()
-    .unique()
-    .references(() => sites.id, { onDelete: 'cascade' }),
-  nameservers: text('nameservers'),
-  ipAddress: text('ip_address'),
-  lastChecked: text('last_checked')
-    .notNull()
-    .default(sql`(datetime('now'))`),
-})
+export const dnsInfo = sqliteTable(
+  'dns_info',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    siteId: integer('site_id')
+      .notNull()
+      .unique()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    nameservers: text('nameservers'),
+    ipAddress: text('ip_address'),
+    lastChecked: text('last_checked')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [index('dns_info_site_id_idx').on(table.siteId)]
+)
 
 // CMS info table
-export const cmsInfo = sqliteTable('cms_info', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  siteId: integer('site_id')
-    .notNull()
-    .unique()
-    .references(() => sites.id, { onDelete: 'cascade' }),
-  cmsName: text('cms_name'),
-  cmsVersion: text('cms_version'),
-  lastChecked: text('last_checked')
-    .notNull()
-    .default(sql`(datetime('now'))`),
-})
+export const cmsInfo = sqliteTable(
+  'cms_info',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    siteId: integer('site_id')
+      .notNull()
+      .unique()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    cmsName: text('cms_name'),
+    cmsVersion: text('cms_version'),
+    lastChecked: text('last_checked')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [index('cms_info_site_id_idx').on(table.siteId)]
+)

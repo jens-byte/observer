@@ -178,20 +178,37 @@ export async function checkSite(siteId: number): Promise<{
   // Handle down/up notification logic
   await handleDownNotification(site, status, errorMessage, statusCode)
 
-  // Check SSL if HTTPS
+  // Check SSL/DNS only once per hour (they're expensive network calls)
+  const ONE_HOUR_AGO = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+
+  // Check SSL if HTTPS and not checked recently
   if (site.url.startsWith('https://')) {
-    try {
-      await checkSSL(siteId, site.url)
-    } catch (error) {
-      console.error(`SSL check failed for ${site.url}:`, (error as Error).message)
+    const sslInfo = db.select({ lastChecked: schema.sslInfo.lastChecked })
+      .from(schema.sslInfo)
+      .where(eq(schema.sslInfo.siteId, siteId))
+      .get()
+
+    if (!sslInfo || sslInfo.lastChecked < ONE_HOUR_AGO) {
+      try {
+        await checkSSL(siteId, site.url)
+      } catch (error) {
+        console.error(`SSL check failed for ${site.url}:`, (error as Error).message)
+      }
     }
   }
 
-  // Check DNS
-  try {
-    await checkDNS(siteId, site.url)
-  } catch (error) {
-    console.error(`DNS check failed for ${site.url}:`, (error as Error).message)
+  // Check DNS only if not checked recently
+  const dnsInfo = db.select({ lastChecked: schema.dnsInfo.lastChecked })
+    .from(schema.dnsInfo)
+    .where(eq(schema.dnsInfo.siteId, siteId))
+    .get()
+
+  if (!dnsInfo || dnsInfo.lastChecked < ONE_HOUR_AGO) {
+    try {
+      await checkDNS(siteId, site.url)
+    } catch (error) {
+      console.error(`DNS check failed for ${site.url}:`, (error as Error).message)
+    }
   }
 
   // Broadcast SSE event

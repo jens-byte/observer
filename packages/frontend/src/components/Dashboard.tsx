@@ -114,8 +114,8 @@ export default function Dashboard() {
     setViewingUsers(others)
   })
 
-  // Auto-refresh every 60 seconds (as fallback, SSE should handle most updates)
-  const refreshInterval = setInterval(fetchSites, 60000)
+  // Auto-refresh every 5 minutes as fallback (SSE handles real-time updates)
+  const refreshInterval = setInterval(fetchSites, 300000)
 
   onCleanup(() => {
     clearInterval(refreshInterval)
