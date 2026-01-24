@@ -62,6 +62,9 @@ settings.put('/', requireWorkspace('editor'), async (c: any) => {
   if (data.slackChannelId !== undefined) updates.slackChannelId = data.slackChannelId
   if (data.screenshotsEnabled !== undefined) updates.screenshotsEnabled = data.screenshotsEnabled
   if (data.consecutiveFailuresThreshold !== undefined) updates.consecutiveFailuresThreshold = data.consecutiveFailuresThreshold
+  if (data.checkTimeoutSeconds !== undefined) updates.checkTimeoutSeconds = data.checkTimeoutSeconds
+  if (data.checkMaxRetries !== undefined) updates.checkMaxRetries = data.checkMaxRetries
+  if (data.checkRetryDelaySeconds !== undefined) updates.checkRetryDelaySeconds = data.checkRetryDelaySeconds
 
   if (Object.keys(updates).length > 0) {
     db.update(schema.settings).set(updates).where(eq(schema.settings.workspaceId, workspaceId)).run()
@@ -128,6 +131,9 @@ function formatSettings(s: typeof schema.settings.$inferSelect): Settings {
     slackChannelId: s.slackChannelId,
     screenshotsEnabled: s.screenshotsEnabled,
     consecutiveFailuresThreshold: s.consecutiveFailuresThreshold,
+    checkTimeoutSeconds: s.checkTimeoutSeconds,
+    checkMaxRetries: s.checkMaxRetries,
+    checkRetryDelaySeconds: s.checkRetryDelaySeconds,
   }
 }
 

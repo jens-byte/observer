@@ -82,6 +82,9 @@ export const updateSettingsSchema = z.object({
   slackChannelId: z.string().max(50).nullable().optional(),
   screenshotsEnabled: z.boolean().optional(),
   consecutiveFailuresThreshold: z.number().int().min(1).max(10).optional(),
+  checkTimeoutSeconds: z.number().int().min(5).max(300).optional(),
+  checkMaxRetries: z.number().int().min(1).max(10).optional(),
+  checkRetryDelaySeconds: z.number().int().min(1).max(60).optional(),
 })
 
 // Bulk import schema

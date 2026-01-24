@@ -152,6 +152,9 @@ export const settings = sqliteTable('settings', {
   slackChannelId: text('slack_channel_id'),
   screenshotsEnabled: integer('screenshots_enabled', { mode: 'boolean' }).notNull().default(true),
   consecutiveFailuresThreshold: integer('consecutive_failures_threshold').notNull().default(2),
+  checkTimeoutSeconds: integer('check_timeout_seconds').notNull().default(60),
+  checkMaxRetries: integer('check_max_retries').notNull().default(5),
+  checkRetryDelaySeconds: integer('check_retry_delay_seconds').notNull().default(5),
 })
 
 // SSL info table

@@ -43,6 +43,13 @@
       "when": 1769241850507,
       "tag": "0005_bright_bucky",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1769242441291,
+      "tag": "0006_tricky_iron_man",
+      "breakpoints": true
     }
   ]
 }

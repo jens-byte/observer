@@ -121,6 +121,9 @@ export interface Settings {
   slackChannelId: string | null
   screenshotsEnabled: boolean
   consecutiveFailuresThreshold: number
+  checkTimeoutSeconds: number
+  checkMaxRetries: number
+  checkRetryDelaySeconds: number
 }
 
 // SSL Info

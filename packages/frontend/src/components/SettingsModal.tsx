@@ -35,6 +35,9 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [slackChannelId, setSlackChannelId] = createSignal('')
   const [screenshotsEnabled, setScreenshotsEnabled] = createSignal(true)
   const [consecutiveFailuresThreshold, setConsecutiveFailuresThreshold] = createSignal(2)
+  const [checkTimeoutSeconds, setCheckTimeoutSeconds] = createSignal(60)
+  const [checkMaxRetries, setCheckMaxRetries] = createSignal(5)
+  const [checkRetryDelaySeconds, setCheckRetryDelaySeconds] = createSignal(5)
 
   // Workspace settings
   const [members, setMembers] = createSignal<WorkspaceMember[]>([])
@@ -81,6 +84,9 @@ export default function SettingsModal(props: SettingsModalProps) {
       setSlackChannelId(data.slackChannelId || '')
       setScreenshotsEnabled(data.screenshotsEnabled)
       setConsecutiveFailuresThreshold(data.consecutiveFailuresThreshold)
+      setCheckTimeoutSeconds(data.checkTimeoutSeconds)
+      setCheckMaxRetries(data.checkMaxRetries)
+      setCheckRetryDelaySeconds(data.checkRetryDelaySeconds)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -234,6 +240,9 @@ export default function SettingsModal(props: SettingsModalProps) {
         slackChannelId: slackChannelId() || null,
         screenshotsEnabled: screenshotsEnabled(),
         consecutiveFailuresThreshold: consecutiveFailuresThreshold(),
+        checkTimeoutSeconds: checkTimeoutSeconds(),
+        checkMaxRetries: checkMaxRetries(),
+        checkRetryDelaySeconds: checkRetryDelaySeconds(),
       })
       setSuccess('Settings saved')
     } catch (err) {
@@ -704,6 +713,68 @@ export default function SettingsModal(props: SettingsModalProps) {
                       min="1"
                       max="10"
                     />
+                  </div>
+                </section>
+
+                <div class="border-t border-[var(--border)]" />
+
+                {/* Site Check Settings */}
+                <section>
+                  <h3 class="text-sm font-medium text-[var(--text)] mb-4">Site Check Settings</h3>
+                  <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-sm text-[var(--text)]">Request Timeout</span>
+                        <p class="text-xs text-[var(--text-tertiary)]">Seconds before a check times out</p>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={checkTimeoutSeconds()}
+                          onInput={(e) => setCheckTimeoutSeconds(parseInt(e.currentTarget.value) || 60)}
+                          disabled={!canEdit()}
+                          class="w-20 rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] text-right focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                          min="5"
+                          max="300"
+                        />
+                        <span class="text-xs text-[var(--text-tertiary)]">sec</span>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-sm text-[var(--text)]">Max Retries</span>
+                        <p class="text-xs text-[var(--text-tertiary)]">Retry attempts before marking as down</p>
+                      </div>
+                      <input
+                        type="number"
+                        value={checkMaxRetries()}
+                        onInput={(e) => setCheckMaxRetries(parseInt(e.currentTarget.value) || 5)}
+                        disabled={!canEdit()}
+                        class="w-20 rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] text-right focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                        min="1"
+                        max="10"
+                      />
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-sm text-[var(--text)]">Retry Delay</span>
+                        <p class="text-xs text-[var(--text-tertiary)]">Seconds between retry attempts</p>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={checkRetryDelaySeconds()}
+                          onInput={(e) => setCheckRetryDelaySeconds(parseInt(e.currentTarget.value) || 5)}
+                          disabled={!canEdit()}
+                          class="w-20 rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] text-right focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                          min="1"
+                          max="60"
+                        />
+                        <span class="text-xs text-[var(--text-tertiary)]">sec</span>
+                      </div>
+                    </div>
                   </div>
                 </section>
               </div>

@@ -6,10 +6,11 @@ import { broadcast } from '../routes/sse'
 import { sendNotification } from './notifier'
 import { captureScreenshot, diagnoseProblem } from './screenshot'
 
-const TIMEOUT = 60000 // 60 seconds
-const MAX_RETRIES = 5
-const RETRY_DELAY = 5000 // 5 seconds between retries
-const CONSECUTIVE_FAILURES_THRESHOLD = 2
+// Default values (used when no workspace settings exist)
+const DEFAULT_TIMEOUT_MS = 60000 // 60 seconds
+const DEFAULT_MAX_RETRIES = 5
+const DEFAULT_RETRY_DELAY_MS = 5000 // 5 seconds between retries
+const DEFAULT_CONSECUTIVE_FAILURES_THRESHOLD = 2
 
 interface FetchResult {
   success: boolean
@@ -18,15 +19,22 @@ interface FetchResult {
   error?: Error
 }
 
+interface FetchOptions {
+  timeoutMs: number
+  maxRetries: number
+  retryDelayMs: number
+}
+
 // Force IPv4 fetch with retries
-async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<FetchResult> {
+async function fetchWithRetry(url: string, options: FetchOptions): Promise<FetchResult> {
+  const { timeoutMs, maxRetries, retryDelayMs } = options
   let lastError: Error | null = null
   const startTime = Date.now()
 
-  for (let attempt = 1; attempt <= retries; attempt++) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT)
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
       const response = await fetch(url, {
         signal: controller.signal,
@@ -45,10 +53,10 @@ async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<Fetch
       return { success: true, response, responseTime }
     } catch (error) {
       lastError = error as Error
-      console.log(`[Monitor] ${url} attempt ${attempt}/${retries} failed: ${lastError.message}`)
+      console.log(`[Monitor] ${url} attempt ${attempt}/${maxRetries} failed: ${lastError.message}`)
 
-      if (attempt < retries) {
-        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY))
+      if (attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
       }
     }
   }
@@ -68,12 +76,25 @@ export async function checkSite(siteId: number): Promise<{
     throw new Error('Site not found')
   }
 
+  // Get workspace settings for check configuration
+  const settings = db
+    .select()
+    .from(schema.settings)
+    .where(eq(schema.settings.workspaceId, site.workspaceId))
+    .get()
+
+  const fetchOptions: FetchOptions = {
+    timeoutMs: (settings?.checkTimeoutSeconds ?? DEFAULT_TIMEOUT_MS / 1000) * 1000,
+    maxRetries: settings?.checkMaxRetries ?? DEFAULT_MAX_RETRIES,
+    retryDelayMs: (settings?.checkRetryDelaySeconds ?? DEFAULT_RETRY_DELAY_MS / 1000) * 1000,
+  }
+
   let status = 'up'
   let statusCode: number | null = null
   let errorMessage: string | null = null
   let responseTime: number | null = null
 
-  const result = await fetchWithRetry(site.url)
+  const result = await fetchWithRetry(site.url, fetchOptions)
 
   if (result.success && result.response) {
     responseTime = result.responseTime!
@@ -249,7 +270,7 @@ async function handleDownNotification(
     .where(eq(schema.settings.workspaceId, site.workspaceId))
     .get()
 
-  const threshold = settings?.consecutiveFailuresThreshold ?? CONSECUTIVE_FAILURES_THRESHOLD
+  const threshold = settings?.consecutiveFailuresThreshold ?? DEFAULT_CONSECUTIVE_FAILURES_THRESHOLD
 
   let { consecutiveFailures, confirmedDownAt, downNotified } = currentState
 
