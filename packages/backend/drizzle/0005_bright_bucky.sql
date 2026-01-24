@@ -1,0 +1,1 @@
+ALTER TABLE `settings` ADD `consecutive_failures_threshold` integer DEFAULT 2 NOT NULL;

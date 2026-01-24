@@ -242,12 +242,21 @@ async function handleDownNotification(
 
   if (!currentState) return
 
+  // Get workspace settings for threshold
+  const settings = db
+    .select()
+    .from(schema.settings)
+    .where(eq(schema.settings.workspaceId, site.workspaceId))
+    .get()
+
+  const threshold = settings?.consecutiveFailuresThreshold ?? CONSECUTIVE_FAILURES_THRESHOLD
+
   let { consecutiveFailures, confirmedDownAt, downNotified } = currentState
 
   if (status === 'down') {
     consecutiveFailures++
 
-    const isConfirmedDown = consecutiveFailures >= CONSECUTIVE_FAILURES_THRESHOLD
+    const isConfirmedDown = consecutiveFailures >= threshold
 
     if (isConfirmedDown && !confirmedDownAt) {
       confirmedDownAt = new Date().toISOString()
@@ -260,46 +269,38 @@ async function handleDownNotification(
       .run()
 
     // Check if we should send notification
-    if (isConfirmedDown && !downNotified) {
-      const settings = db
-        .select()
-        .from(schema.settings)
-        .where(eq(schema.settings.workspaceId, site.workspaceId))
-        .get()
+    if (isConfirmedDown && !downNotified && settings) {
+      const delayMs = (settings.webhookDelaySeconds || 0) * 1000
+      const confirmedDownTime = new Date(confirmedDownAt!).getTime()
+      const downtime = Date.now() - confirmedDownTime
 
-      if (settings) {
-        const delayMs = (settings.webhookDelaySeconds || 0) * 1000
-        const confirmedDownTime = new Date(confirmedDownAt!).getTime()
-        const downtime = Date.now() - confirmedDownTime
+      if (downtime >= delayMs) {
+        // Diagnose the problem
+        const diagnosis = diagnoseProblem(errorMessage, statusCode)
 
-        if (downtime >= delayMs) {
-          // Diagnose the problem
-          const diagnosis = diagnoseProblem(errorMessage, statusCode)
-
-          // Capture screenshot (async, don't block notification)
-          let screenshotBuffer: Buffer | null = null
-          try {
-            console.log(`[Monitor] Capturing screenshot for ${site.name}...`)
-            screenshotBuffer = await captureScreenshot(site.url)
-            if (screenshotBuffer) {
-              console.log(`[Monitor] Screenshot captured for ${site.name}`)
-            }
-          } catch (error) {
-            console.error(`[Monitor] Screenshot failed for ${site.name}:`, (error as Error).message)
+        // Capture screenshot (async, don't block notification)
+        let screenshotBuffer: Buffer | null = null
+        try {
+          console.log(`[Monitor] Capturing screenshot for ${site.name}...`)
+          screenshotBuffer = await captureScreenshot(site.url)
+          if (screenshotBuffer) {
+            console.log(`[Monitor] Screenshot captured for ${site.name}`)
           }
-
-          // Send notification with screenshot and diagnosis
-          sendNotification(site.workspaceId, {
-            siteName: site.name,
-            siteUrl: site.url,
-            status: 'down',
-            errorMessage: errorMessage || undefined,
-            statusCode: statusCode || undefined,
-            diagnosis,
-          }, screenshotBuffer || undefined).catch(console.error)
-
-          db.update(schema.sites).set({ downNotified: true }).where(eq(schema.sites.id, site.id)).run()
+        } catch (error) {
+          console.error(`[Monitor] Screenshot failed for ${site.name}:`, (error as Error).message)
         }
+
+        // Send notification with screenshot and diagnosis
+        sendNotification(site.workspaceId, {
+          siteName: site.name,
+          siteUrl: site.url,
+          status: 'down',
+          errorMessage: errorMessage || undefined,
+          statusCode: statusCode || undefined,
+          diagnosis,
+        }, screenshotBuffer || undefined).catch(console.error)
+
+        db.update(schema.sites).set({ downNotified: true }).where(eq(schema.sites.id, site.id)).run()
       }
     }
   } else if (status === 'up') {

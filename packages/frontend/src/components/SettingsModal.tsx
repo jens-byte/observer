@@ -34,6 +34,7 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [slackBotToken, setSlackBotToken] = createSignal('')
   const [slackChannelId, setSlackChannelId] = createSignal('')
   const [screenshotsEnabled, setScreenshotsEnabled] = createSignal(true)
+  const [consecutiveFailuresThreshold, setConsecutiveFailuresThreshold] = createSignal(2)
 
   // Workspace settings
   const [members, setMembers] = createSignal<WorkspaceMember[]>([])
@@ -79,6 +80,7 @@ export default function SettingsModal(props: SettingsModalProps) {
       setSlackBotToken(data.slackBotToken || '')
       setSlackChannelId(data.slackChannelId || '')
       setScreenshotsEnabled(data.screenshotsEnabled)
+      setConsecutiveFailuresThreshold(data.consecutiveFailuresThreshold)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -231,6 +233,7 @@ export default function SettingsModal(props: SettingsModalProps) {
         slackBotToken: slackBotToken() || null,
         slackChannelId: slackChannelId() || null,
         screenshotsEnabled: screenshotsEnabled(),
+        consecutiveFailuresThreshold: consecutiveFailuresThreshold(),
       })
       setSuccess('Settings saved')
     } catch (err) {
@@ -679,6 +682,27 @@ export default function SettingsModal(props: SettingsModalProps) {
                       disabled={!canEdit()}
                       class="w-20 rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] text-right focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
                       min="1"
+                    />
+                  </div>
+                </section>
+
+                <div class="border-t border-[var(--border)]" />
+
+                {/* Consecutive Failures Threshold */}
+                <section>
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h3 class="text-sm font-medium text-[var(--text)]">Consecutive Failures</h3>
+                      <p class="text-xs text-[var(--text-tertiary)]">Failures required before sending down alert</p>
+                    </div>
+                    <input
+                      type="number"
+                      value={consecutiveFailuresThreshold()}
+                      onInput={(e) => setConsecutiveFailuresThreshold(parseInt(e.currentTarget.value) || 2)}
+                      disabled={!canEdit()}
+                      class="w-20 rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)] text-right focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+                      min="1"
+                      max="10"
                     />
                   </div>
                 </section>

@@ -61,6 +61,7 @@ settings.put('/', requireWorkspace('editor'), async (c: any) => {
   if (data.slackBotToken !== undefined) updates.slackBotToken = data.slackBotToken
   if (data.slackChannelId !== undefined) updates.slackChannelId = data.slackChannelId
   if (data.screenshotsEnabled !== undefined) updates.screenshotsEnabled = data.screenshotsEnabled
+  if (data.consecutiveFailuresThreshold !== undefined) updates.consecutiveFailuresThreshold = data.consecutiveFailuresThreshold
 
   if (Object.keys(updates).length > 0) {
     db.update(schema.settings).set(updates).where(eq(schema.settings.workspaceId, workspaceId)).run()
@@ -126,6 +127,7 @@ function formatSettings(s: typeof schema.settings.$inferSelect): Settings {
     slackBotToken: s.slackBotToken,
     slackChannelId: s.slackChannelId,
     screenshotsEnabled: s.screenshotsEnabled,
+    consecutiveFailuresThreshold: s.consecutiveFailuresThreshold,
   }
 }
 

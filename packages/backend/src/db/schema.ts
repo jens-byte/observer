@@ -151,6 +151,7 @@ export const settings = sqliteTable('settings', {
   slackBotToken: text('slack_bot_token'),
   slackChannelId: text('slack_channel_id'),
   screenshotsEnabled: integer('screenshots_enabled', { mode: 'boolean' }).notNull().default(true),
+  consecutiveFailuresThreshold: integer('consecutive_failures_threshold').notNull().default(2),
 })
 
 // SSL info table

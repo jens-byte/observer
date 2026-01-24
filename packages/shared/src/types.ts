@@ -120,6 +120,7 @@ export interface Settings {
   slackBotToken: string | null
   slackChannelId: string | null
   screenshotsEnabled: boolean
+  consecutiveFailuresThreshold: number
 }
 
 // SSL Info

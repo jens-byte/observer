@@ -81,6 +81,7 @@ export const updateSettingsSchema = z.object({
   slackBotToken: z.string().max(200).nullable().optional(),
   slackChannelId: z.string().max(50).nullable().optional(),
   screenshotsEnabled: z.boolean().optional(),
+  consecutiveFailuresThreshold: z.number().int().min(1).max(10).optional(),
 })
 
 // Bulk import schema
