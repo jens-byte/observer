@@ -28,6 +28,7 @@ export default function SiteDetail() {
   const [currentPage, setCurrentPage] = createSignal(1)
   const [dateFrom, setDateFrom] = createSignal('')
   const [dateTo, setDateTo] = createSignal('')
+  const [timeScale, setTimeScale] = createSignal('1h') // Default to 1 hour
   const itemsPerPage = 25
 
   const fetchData = async () => {
@@ -43,7 +44,7 @@ export default function SiteDetail() {
       setIsLoading(true)
       const [siteData, checksData] = await Promise.all([
         sites.get(auth.currentWorkspace.id, siteId),
-        sites.getChecks(auth.currentWorkspace.id, siteId, 500),
+        sites.getChecks(auth.currentWorkspace.id, siteId, 1500),
       ])
       setSite(siteData)
       setChecks(checksData)
@@ -102,7 +103,17 @@ export default function SiteDetail() {
   const graphPadding = { top: 20, right: 20, bottom: 30, left: 60 }
 
   const graphData = () => {
-    const data = checks().filter(c => c.responseTime !== null).slice(0, 100).reverse()
+    // Calculate how many checks to show based on time scale (checks run every 60s)
+    const scaleToChecks: Record<string, number> = {
+      '5m': 5,
+      '1h': 60,
+      '4h': 240,
+      '8h': 480,
+      '12h': 720,
+      '24h': 1440,
+    }
+    const maxChecks = scaleToChecks[timeScale()] || 60
+    const data = checks().filter(c => c.responseTime !== null).slice(0, maxChecks).reverse()
     if (data.length === 0) return null
 
     const times = data.map(c => c.responseTime!)
@@ -126,7 +137,38 @@ export default function SiteDetail() {
     // Create path for line
     const linePath = `M ${points.map(p => `${p.x} ${p.y}`).join(' L ')}`
 
-    return { points, areaPath, linePath, maxTime, innerHeight, innerWidth }
+    // Generate time labels for x-axis (show 5-7 time points)
+    const numTimeLabels = Math.min(6, data.length)
+    const timeLabels = Array.from({ length: numTimeLabels }, (_, i) => {
+      const index = Math.floor(i * (data.length - 1) / (numTimeLabels - 1 || 1))
+      const check = data[index]
+      const x = graphPadding.left + (index / (data.length - 1 || 1)) * innerWidth
+      const date = new Date(check.checkedAt)
+
+      // Format label based on time scale
+      let label: string
+      const currentScale = timeScale()
+      if (currentScale === '5m') {
+        // For 5 min, show seconds too
+        label = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+      } else if (currentScale === '24h' || currentScale === '12h') {
+        // For longer ranges, check if we need to show the date
+        const now = new Date()
+        const isToday = date.toDateString() === now.toDateString()
+        if (isToday) {
+          label = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+        } else {
+          label = `${date.getMonth() + 1}/${date.getDate()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`
+        }
+      } else {
+        // Default: just show time
+        label = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+      }
+
+      return { x, label, date }
+    })
+
+    return { points, areaPath, linePath, maxTime, innerHeight, innerWidth, timeLabels, data }
   }
 
   const handleBack = () => {
@@ -290,7 +332,32 @@ export default function SiteDetail() {
 
           {/* Response Time Graph */}
           <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]/50 p-6 mb-8">
-            <h2 class="text-lg font-medium text-[var(--text)] mb-4">Response Time History</h2>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+              <h2 class="text-lg font-medium text-[var(--text)]">Response Time History</h2>
+              <div class="flex items-center gap-2 flex-wrap">
+                <For each={[
+                  { value: '5m', label: '5 min' },
+                  { value: '1h', label: '1 hour' },
+                  { value: '4h', label: '4 hours' },
+                  { value: '8h', label: '8 hours' },
+                  { value: '12h', label: '12 hours' },
+                  { value: '24h', label: '24 hours' },
+                ]}>
+                  {(scale) => (
+                    <button
+                      onClick={() => setTimeScale(scale.value)}
+                      class={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                        timeScale() === scale.value
+                          ? 'border-[var(--text)] bg-[var(--text)] text-[var(--bg)] font-medium'
+                          : 'border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--bg-hover)]'
+                      }`}
+                    >
+                      {scale.label}
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
             <Show when={graphData()} fallback={
               <div class="text-center py-8 text-[var(--text-tertiary)]">No response data available</div>
             }>
@@ -301,7 +368,7 @@ export default function SiteDetail() {
                     class="w-full max-w-full"
                     style={{ "min-width": "400px" }}
                   >
-                    {/* Grid lines */}
+                    {/* Horizontal grid lines (Y-axis) */}
                     <For each={[0, 0.25, 0.5, 0.75, 1]}>
                       {(ratio) => (
                         <>
@@ -320,6 +387,32 @@ export default function SiteDetail() {
                             class="text-[10px] fill-[var(--text-tertiary)]"
                           >
                             {formatResponseTime(Math.round(data().maxTime * (1 - ratio)))}
+                          </text>
+                        </>
+                      )}
+                    </For>
+
+                    {/* Vertical grid lines and time labels (X-axis) */}
+                    <For each={data().timeLabels}>
+                      {(timeLabel) => (
+                        <>
+                          <line
+                            x1={timeLabel.x}
+                            y1={graphPadding.top}
+                            x2={timeLabel.x}
+                            y2={graphPadding.top + data().innerHeight}
+                            stroke="var(--border)"
+                            stroke-width="1"
+                            stroke-dasharray="2,2"
+                            opacity="0.5"
+                          />
+                          <text
+                            x={timeLabel.x}
+                            y={graphPadding.top + data().innerHeight + 18}
+                            text-anchor="middle"
+                            class="text-[10px] fill-[var(--text-tertiary)]"
+                          >
+                            {timeLabel.label}
                           </text>
                         </>
                       )}
@@ -346,7 +439,7 @@ export default function SiteDetail() {
                         <circle
                           cx={point.x}
                           cy={point.y}
-                          r="3"
+                          r="2"
                           fill={point.check.status === 'down' ? '#ef4444' : point.check.isSlow ? '#f59e0b' : '#10a37f'}
                           class="hover:r-5 transition-all cursor-pointer"
                         >

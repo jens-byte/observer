@@ -47,15 +47,16 @@ RUN apt-get update && apt-get install -y \
     libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Playwright Chromium browser early with cache mount
+RUN --mount=type=cache,target=/root/.cache/ms-playwright \
+    bunx playwright install chromium
+
 # Copy everything from builder (including node_modules)
 COPY --from=builder /app/package.json /app/bun.lock ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/packages/backend ./packages/backend
 COPY --from=builder /app/packages/frontend/dist ./packages/backend/public
-
-# Install Playwright Chromium browser
-RUN bunx playwright install chromium
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data
