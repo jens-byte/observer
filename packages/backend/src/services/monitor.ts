@@ -4,7 +4,7 @@ import { checkSSL } from './ssl-checker'
 import { checkDNS } from './dns-checker'
 import { broadcast } from '../routes/sse'
 import { sendNotification } from './notifier'
-import { captureScreenshot, diagnoseProblem } from './screenshot'
+import { diagnoseProblem } from './screenshot'
 
 // Default values (used when no workspace settings exist)
 const DEFAULT_TIMEOUT_MS = 60000 // 60 seconds
@@ -299,19 +299,7 @@ async function handleDownNotification(
         // Diagnose the problem
         const diagnosis = diagnoseProblem(errorMessage, statusCode)
 
-        // Capture screenshot (async, don't block notification)
-        let screenshotBuffer: Buffer | null = null
-        try {
-          console.log(`[Monitor] Capturing screenshot for ${site.name}...`)
-          screenshotBuffer = await captureScreenshot(site.url)
-          if (screenshotBuffer) {
-            console.log(`[Monitor] Screenshot captured for ${site.name}`)
-          }
-        } catch (error) {
-          console.error(`[Monitor] Screenshot failed for ${site.name}:`, (error as Error).message)
-        }
-
-        // Send notification with screenshot and diagnosis
+        // Send notification with diagnosis
         sendNotification(site.workspaceId, {
           siteName: site.name,
           siteUrl: site.url,
@@ -319,7 +307,7 @@ async function handleDownNotification(
           errorMessage: errorMessage || undefined,
           statusCode: statusCode || undefined,
           diagnosis,
-        }, screenshotBuffer || undefined).catch(console.error)
+        }).catch(console.error)
 
         db.update(schema.sites).set({ downNotified: true }).where(eq(schema.sites.id, site.id)).run()
       }
