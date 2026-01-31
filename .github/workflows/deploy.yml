@@ -13,7 +13,6 @@ jobs:
           host: observer.megavisor.be
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          command_timeout: 20m
           script: |
             set -e
 
