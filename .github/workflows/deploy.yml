@@ -28,10 +28,11 @@ jobs:
             git reset --hard origin/main
 
             # Stop any existing containers and processes on port 3001
+            docker stop observer sqlite-web 2>/dev/null || true
+            docker rm observer sqlite-web 2>/dev/null || true
             docker compose down --remove-orphans || true
-            docker stop observer 2>/dev/null || true
-            docker rm observer 2>/dev/null || true
             fuser -k 3001/tcp 2>/dev/null || true
+            sleep 2
 
             docker compose up --build -d
 
