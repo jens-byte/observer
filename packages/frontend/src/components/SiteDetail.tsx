@@ -631,9 +631,9 @@ export default function SiteDetail() {
                       {(point) => (
                         <>
                           <line
-                            x1={point().x}
+                            x1={point().mouseX}
                             y1={graphPadding.top}
-                            x2={point().x}
+                            x2={point().mouseX}
                             y2={graphPadding.top + data().innerHeight}
                             stroke="var(--text)"
                             stroke-width="1"
