@@ -28,7 +28,7 @@ export default function SiteDetail() {
   const [currentPage, setCurrentPage] = createSignal(1)
   const [dateFrom, setDateFrom] = createSignal('')
   const [dateTo, setDateTo] = createSignal('')
-  const [timeScale, setTimeScale] = createSignal('2h') // Default to 2 hours
+  const [timeScale, setTimeScale] = createSignal('4h') // Default to 4 hours
   const itemsPerPage = 25
 
   const fetchData = async () => {
@@ -87,6 +87,35 @@ export default function SiteDetail() {
     return d.toLocaleDateString()
   }
 
+  // Color gradient for response times: green (fast) to red (slow)
+  const getColorForResponseTime = (responseTime: number) => {
+    if (responseTime <= 500) {
+      // Green to yellow-green gradient (0-500ms)
+      const ratio = responseTime / 500
+      const r = Math.round(16 + (180 - 16) * ratio)
+      const g = Math.round(163 + (200 - 163) * ratio)
+      const b = Math.round(127 + (0 - 127) * ratio)
+      return `rgb(${r}, ${g}, ${b})`
+    } else if (responseTime <= 1500) {
+      // Yellow to orange gradient (500-1500ms)
+      const ratio = (responseTime - 500) / 1000
+      const r = Math.round(180 + (249 - 180) * ratio)
+      const g = Math.round(200 + (115 - 200) * ratio)
+      const b = 0
+      return `rgb(${r}, ${g}, ${b})`
+    } else if (responseTime <= 3000) {
+      // Orange to red gradient (1500-3000ms)
+      const ratio = (responseTime - 1500) / 1500
+      const r = Math.round(249 + (239 - 249) * ratio)
+      const g = Math.round(115 + (68 - 115) * ratio)
+      const b = Math.round(0 + (68 - 0) * ratio)
+      return `rgb(${r}, ${g}, ${b})`
+    } else {
+      // Deep red for very slow (>3000ms)
+      return 'rgb(239, 68, 68)'
+    }
+  }
+
   const getStatusBadge = (status: string, isSlow: boolean) => {
     if (status === 'down') {
       return <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-red-500/20 text-red-500">Down</span>
@@ -105,14 +134,14 @@ export default function SiteDetail() {
   const graphData = () => {
     // Calculate how many checks to show based on time scale (checks run every 60s)
     const scaleToChecks: Record<string, number> = {
-      '2h': 120,
       '4h': 240,
       '8h': 480,
+      '12h': 720,
       '1d': 1440,
       '1w': 10080,
       '1m': 43200,
     }
-    const maxChecks = scaleToChecks[timeScale()] || 120
+    const maxChecks = scaleToChecks[timeScale()] || 240
     const data = checks().filter(c => c.responseTime !== null).slice(0, maxChecks).reverse()
     if (data.length === 0) return null
 
@@ -134,8 +163,19 @@ export default function SiteDetail() {
       points.map(p => `L ${p.x} ${p.y}`).join(' ') +
       ` L ${points[points.length - 1].x} ${graphPadding.top + innerHeight} Z`
 
-    // Create path for line
-    const linePath = `M ${points.map(p => `${p.x} ${p.y}`).join(' L ')}`
+    // Create colored line segments
+    const lineSegments = points.slice(0, -1).map((point, i) => {
+      const nextPoint = points[i + 1]
+      const avgResponseTime = (point.check.responseTime! + nextPoint.check.responseTime!) / 2
+      return {
+        x1: point.x,
+        y1: point.y,
+        x2: nextPoint.x,
+        y2: nextPoint.y,
+        color: getColorForResponseTime(avgResponseTime),
+        responseTime: avgResponseTime
+      }
+    })
 
     // Generate time labels for x-axis
     const numTimeLabels = Math.min(6, data.length)
@@ -168,7 +208,7 @@ export default function SiteDetail() {
       return { x, label, date }
     })
 
-    return { points, areaPath, linePath, maxTime, innerHeight, innerWidth, timeLabels, data }
+    return { points, areaPath, lineSegments, maxTime, innerHeight, innerWidth, timeLabels, data }
   }
 
   const handleBack = () => {
@@ -336,12 +376,12 @@ export default function SiteDetail() {
               <h2 class="text-lg font-medium text-[var(--text)]">Response Time History</h2>
               <div class="flex items-center gap-2 flex-wrap">
                 <For each={[
-                  { value: '2h', label: '2 hours' },
-                  { value: '4h', label: '4 hours' },
-                  { value: '8h', label: '8 hours' },
-                  { value: '1d', label: '1 day' },
-                  { value: '1w', label: '1 week' },
-                  { value: '1m', label: '1 month' },
+                  { value: '4h', label: '4H' },
+                  { value: '8h', label: '8H' },
+                  { value: '12h', label: '12H' },
+                  { value: '1d', label: '1D' },
+                  { value: '1w', label: '1W' },
+                  { value: '1m', label: '1M' },
                 ]}>
                   {(scale) => (
                     <button
@@ -425,26 +465,18 @@ export default function SiteDetail() {
                       opacity="0.3"
                     />
 
-                    {/* Line */}
-                    <path
-                      d={data().linePath}
-                      fill="none"
-                      stroke="#10a37f"
-                      stroke-width="2"
-                    />
-
-                    {/* Points */}
-                    <For each={data().points}>
-                      {(point) => (
-                        <circle
-                          cx={point.x}
-                          cy={point.y}
-                          r="3"
-                          fill={point.check.status === 'down' ? '#ef4444' : point.check.isSlow ? '#f59e0b' : '#10a37f'}
-                          class="hover:r-5 transition-all cursor-pointer"
-                        >
-                          <title>{`${formatResponseTime(point.check.responseTime)} - ${formatDate(point.check.checkedAt)}`}</title>
-                        </circle>
+                    {/* Color-coded line segments */}
+                    <For each={data().lineSegments}>
+                      {(segment) => (
+                        <line
+                          x1={segment.x1}
+                          y1={segment.y1}
+                          x2={segment.x2}
+                          y2={segment.y2}
+                          stroke={segment.color}
+                          stroke-width="1"
+                          stroke-linecap="round"
+                        />
                       )}
                     </For>
 
