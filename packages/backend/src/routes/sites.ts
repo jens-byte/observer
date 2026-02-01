@@ -498,7 +498,7 @@ sites.post('/:siteId/widget-token', requireWorkspace('editor'), (c: any) => {
 sites.get('/:siteId/checks', requireWorkspace('guest'), (c: any) => {
   const workspaceId = c.get('workspaceId')
   const siteId = parseInt(c.req.param('siteId'), 10)
-  const limit = Math.min(parseInt(c.req.query('limit') || '100', 10), 2000)
+  const limit = Math.min(parseInt(c.req.query('limit') || '100', 10), 50000)
 
   const site = db
     .select()

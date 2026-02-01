@@ -42,9 +42,20 @@ export default function SiteDetail() {
 
     try {
       setIsLoading(true)
+      // Calculate how many checks to fetch based on current time scale (with buffer)
+      const scaleToChecks: Record<string, number> = {
+        '4h': 300,      // 4 hours + buffer
+        '8h': 550,      // 8 hours + buffer
+        '12h': 800,     // 12 hours + buffer
+        '1d': 1600,     // 1 day + buffer
+        '1w': 11000,    // 1 week + buffer
+        '1m': 45000,    // 1 month + buffer
+      }
+      const limit = scaleToChecks[timeScale()] || 1600
+
       const [siteData, checksData] = await Promise.all([
         sites.get(auth.currentWorkspace.id, siteId),
-        sites.getChecks(auth.currentWorkspace.id, siteId, 2000),
+        sites.getChecks(auth.currentWorkspace.id, siteId, limit),
       ])
       setSite(siteData)
       setChecks(checksData)
@@ -58,6 +69,14 @@ export default function SiteDetail() {
 
   createEffect(() => {
     if (auth.currentWorkspace) {
+      fetchData()
+    }
+  })
+
+  // Refetch when time scale changes
+  createEffect(() => {
+    timeScale() // Track the signal
+    if (auth.currentWorkspace && !isLoading()) {
       fetchData()
     }
   })
