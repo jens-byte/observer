@@ -213,3 +213,41 @@ export interface SsePresenceEvent {
 }
 
 export type SseEvent = SseCheckEvent | SseSiteUpdateEvent | SseConnectedEvent | SsePresenceEvent
+
+// Analytics types
+export type AnalyticsTimeRange = '1d' | '1w' | '1m' | '3m' | '6m' | '1y'
+export type AnalyticsMetric = 'stats' | 'timeseries' | 'distribution' | 'comparison'
+
+export interface SiteStats {
+  avg: number
+  p50: number
+  p95: number
+  p99: number
+  min: number
+  max: number
+  totalChecks: number
+  uptime: number
+}
+
+export interface TimeseriesPoint {
+  timestamp: string
+  avg: number
+  p95: number
+  count: number
+}
+
+export interface DistributionBucket {
+  bucket: string
+  count: number
+  percentage: number
+}
+
+export interface AnalyticsResponse {
+  stats?: Record<number, SiteStats>
+  timeseries?: Record<number, TimeseriesPoint[]>
+  distribution?: Record<number, DistributionBucket[]>
+  comparison?: {
+    timestamps: string[]
+    series: Record<number, (number | null)[]>
+  }
+}
