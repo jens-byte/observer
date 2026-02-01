@@ -303,9 +303,18 @@ export default function SiteDetail() {
 
   // Simple hover handler
   const handleMouseMove = (e: MouseEvent) => {
-    const rect = (e.currentTarget as SVGElement).getBoundingClientRect()
-    const mouseX = e.clientX - rect.left
-    const mouseY = e.clientY - rect.top
+    const svg = e.currentTarget as SVGElement
+    const ctm = svg.getScreenCTM()
+    if (!ctm) return
+
+    // Transform screen coordinates to SVG coordinates
+    const pt = svg.createSVGPoint()
+    pt.x = e.clientX
+    pt.y = e.clientY
+    const svgPoint = pt.matrixTransform(ctm.inverse())
+
+    const mouseX = svgPoint.x
+    const mouseY = svgPoint.y
 
     const data = graphData()
     if (!data || !data.points.length) {
