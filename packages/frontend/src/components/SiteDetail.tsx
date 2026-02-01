@@ -24,6 +24,7 @@ export default function SiteDetail() {
   const [site, setSite] = createSignal<SiteWithDetails | null>(null)
   const [checks, setChecks] = createSignal<Check[]>([])
   const [isLoading, setIsLoading] = createSignal(true)
+  const [isLoadingChecks, setIsLoadingChecks] = createSignal(false)
   const [error, setError] = createSignal('')
   const [currentPage, setCurrentPage] = createSignal(1)
   const [dateFrom, setDateFrom] = createSignal('')
@@ -31,7 +32,20 @@ export default function SiteDetail() {
   const [timeScale, setTimeScale] = createSignal('4h') // Default to 4 hours
   const itemsPerPage = 25
 
-  const fetchData = async () => {
+  // Calculate how many checks to fetch based on time scale (with small buffer)
+  const getChecksLimit = (scale: string) => {
+    const scaleToChecks: Record<string, number> = {
+      '4h': 300,      // 4 hours + buffer
+      '8h': 550,      // 8 hours + buffer
+      '12h': 800,     // 12 hours + buffer
+      '1d': 1600,     // 1 day + buffer
+      '1w': 11000,    // 1 week + buffer
+      '1m': 45000,    // 1 month + buffer
+    }
+    return scaleToChecks[scale] || 300
+  }
+
+  const fetchSite = async () => {
     if (!auth.currentWorkspace) return
     const siteId = parseInt(params.siteId, 10)
     if (isNaN(siteId)) {
@@ -42,23 +56,8 @@ export default function SiteDetail() {
 
     try {
       setIsLoading(true)
-      // Calculate how many checks to fetch based on current time scale (with buffer)
-      const scaleToChecks: Record<string, number> = {
-        '4h': 300,      // 4 hours + buffer
-        '8h': 550,      // 8 hours + buffer
-        '12h': 800,     // 12 hours + buffer
-        '1d': 1600,     // 1 day + buffer
-        '1w': 11000,    // 1 week + buffer
-        '1m': 45000,    // 1 month + buffer
-      }
-      const limit = scaleToChecks[timeScale()] || 1600
-
-      const [siteData, checksData] = await Promise.all([
-        sites.get(auth.currentWorkspace.id, siteId),
-        sites.getChecks(auth.currentWorkspace.id, siteId, limit),
-      ])
+      const siteData = await sites.get(auth.currentWorkspace.id, siteId)
       setSite(siteData)
-      setChecks(checksData)
       setError('')
     } catch (err) {
       setError((err as Error).message)
@@ -67,22 +66,48 @@ export default function SiteDetail() {
     }
   }
 
+  const fetchChecks = async (scale: string) => {
+    if (!auth.currentWorkspace) return
+    const siteId = parseInt(params.siteId, 10)
+    if (isNaN(siteId)) return
+
+    try {
+      setIsLoadingChecks(true)
+      const limit = getChecksLimit(scale)
+      const checksData = await sites.getChecks(auth.currentWorkspace.id, siteId, limit)
+      setChecks(checksData)
+    } catch (err) {
+      console.error('Failed to fetch checks:', err)
+    } finally {
+      setIsLoadingChecks(false)
+    }
+  }
+
+  const [siteLoaded, setSiteLoaded] = createSignal(false)
+
+  // Load site info once
   createEffect(() => {
+    if (auth.currentWorkspace && !siteLoaded()) {
+      fetchSite()
+      setSiteLoaded(true)
+    }
+  })
+
+  // Load checks for current time scale
+  createEffect(() => {
+    const scale = timeScale()
+    if (auth.currentWorkspace && siteLoaded()) {
+      fetchChecks(scale)
+    }
+  })
+
+  // Auto-refresh every 60 seconds - only refresh checks for current scale
+  const refreshInterval = setInterval(() => {
     if (auth.currentWorkspace) {
-      fetchData()
+      fetchSite()
+      fetchChecks(timeScale())
     }
-  })
-
-  // Refetch when time scale changes
-  createEffect(() => {
-    timeScale() // Track the signal
-    if (auth.currentWorkspace && !isLoading()) {
-      fetchData()
-    }
-  })
-
-  // Auto-refresh every 60 seconds
-  const refreshInterval = setInterval(fetchData, 60000)
+  }, 60000)
   onCleanup(() => clearInterval(refreshInterval))
 
   const formatResponseTime = (ms: number | null) => {
