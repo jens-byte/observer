@@ -32,25 +32,8 @@ export default function SiteDetail() {
   const [timeScale, setTimeScale] = createSignal('4h') // Default to 4 hours
   const itemsPerPage = 25
 
-  // Zoom & Pan State
-  const [zoomDomain, setZoomDomain] = createSignal<[number, number] | null>(null)
-  const [isDragging, setIsDragging] = createSignal(false)
-  const [isSelecting, setIsSelecting] = createSignal(false)
-  const [dragStart, setDragStart] = createSignal<{ x: number; timestamp: number } | null>(null)
-  const [selectionBox, setSelectionBox] = createSignal<{ x1: number; x2: number } | null>(null)
-  const [hoveredPoint, setHoveredPoint] = createSignal<{ timestamp: number; responseTime: number; x: number; y: number } | null>(null)
-
-  // Computed signals for time ranges
-  const dataTimeRange = createMemo(() => {
-    const data = checks().filter(c => c.responseTime !== null)
-    if (data.length === 0) return null
-    const timestamps = data.map(c => new Date(c.checkedAt).getTime())
-    return [Math.min(...timestamps), Math.max(...timestamps)] as [number, number]
-  })
-
-  const visibleTimeRange = createMemo(() => {
-    return zoomDomain() || dataTimeRange()
-  })
+  // Hover state
+  const [hoveredPoint, setHoveredPoint] = createSignal<{ timestamp: number; responseTime: number; x: number; y: number; mouseX: number; mouseY: number } | null>(null)
 
   // Calculate how many checks to fetch based on time scale (with small buffer)
   const getChecksLimit = (scale: string) => {
@@ -236,19 +219,17 @@ export default function SiteDetail() {
   const graphPadding = { top: 20, right: 20, bottom: 30, left: 60 }
 
   const graphData = () => {
-    const range = visibleTimeRange()
-    if (!range) return null
-
-    const [startTs, endTs] = range
-
-    // Filter to visible range with buffer for smooth rendering
-    const allData = checks().filter(c => c.responseTime !== null)
-    const buffer = (endTs - startTs) * 0.1
-    const data = allData.filter(c => {
-      const ts = new Date(c.checkedAt).getTime()
-      return ts >= startTs - buffer && ts <= endTs + buffer
-    }).sort((a, b) => new Date(a.checkedAt).getTime() - new Date(b.checkedAt).getTime())
-
+    // Calculate how many checks to show based on time scale (checks run every 60s)
+    const scaleToChecks: Record<string, number> = {
+      '4h': 240,
+      '8h': 480,
+      '12h': 720,
+      '1d': 1440,
+      '1w': 10080,
+      '1m': 43200,
+    }
+    const maxChecks = scaleToChecks[timeScale()] || 240
+    const data = checks().filter(c => c.responseTime !== null).slice(0, maxChecks).reverse()
     if (data.length === 0) return null
 
     const times = data.map(c => c.responseTime!)
@@ -258,7 +239,10 @@ export default function SiteDetail() {
     const innerWidth = graphWidth - graphPadding.left - graphPadding.right
     const innerHeight = graphHeight - graphPadding.top - graphPadding.bottom
 
-    // Calculate intelligent time labels
+    // Calculate time range for intelligent labels
+    const timestamps = data.map(c => new Date(c.checkedAt).getTime())
+    const startTs = Math.min(...timestamps)
+    const endTs = Math.max(...timestamps)
     const { ticks, interval } = calculateTimeIntervals(startTs, endTs)
 
     // Map points using timestamp-based X positioning
@@ -317,147 +301,19 @@ export default function SiteDetail() {
     return { points, areaPath, lineSegments, maxTime, innerHeight, innerWidth, majorGridLines, minorGridLines, data }
   }
 
-  // Mouse wheel zoom
-  const handleWheel = (e: WheelEvent) => {
-    e.preventDefault()
-    const rect = (e.currentTarget as SVGElement).getBoundingClientRect()
-    const mouseX = e.clientX - rect.left
-    const range = visibleTimeRange()
-    if (!range) return
-
-    const [start, end] = range
-    const duration = end - start
-    const innerWidth = graphWidth - graphPadding.left - graphPadding.right
-    const mouseRatio = Math.max(0, Math.min(1, (mouseX - graphPadding.left) / innerWidth))
-    const mouseTimestamp = start + duration * mouseRatio
-
-    const zoomFactor = e.deltaY < 0 ? 0.8 : 1.25
-    const newDuration = duration * zoomFactor
-
-    const newStart = mouseTimestamp - newDuration * mouseRatio
-    const newEnd = mouseTimestamp + newDuration * (1 - mouseRatio)
-
-    const dataRange = dataTimeRange()
-    if (!dataRange) return
-    const [dataStart, dataEnd] = dataRange
-
-    // Clamp to data boundaries
-    const clampedStart = Math.max(dataStart, newStart)
-    const clampedEnd = Math.min(dataEnd, newEnd)
-
-    // Don't zoom if we'd be outside data range
-    if (clampedEnd - clampedStart > 60000) { // Minimum 1 minute visible
-      setZoomDomain([clampedStart, clampedEnd])
-    }
-  }
-
-  // Mouse down - start drag or selection
-  const handleMouseDown = (e: MouseEvent) => {
-    const rect = (e.currentTarget as SVGElement).getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const range = visibleTimeRange()
-    if (!range) return
-
-    const [start, end] = range
-    const innerWidth = graphWidth - graphPadding.left - graphPadding.right
-    const ratio = (x - graphPadding.left) / innerWidth
-    const timestamp = start + (end - start) * ratio
-
-    if (e.shiftKey) {
-      setIsSelecting(true)
-      setSelectionBox({ x1: x, x2: x })
-    } else {
-      setIsDragging(true)
-    }
-    setDragStart({ x, timestamp })
-  }
-
-  // Mouse move - update drag, selection, or hover
+  // Simple hover handler
   const handleMouseMove = (e: MouseEvent) => {
     const rect = (e.currentTarget as SVGElement).getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
+    const mouseX = e.clientX - rect.left
+    const mouseY = e.clientY - rect.top
 
-    if (isSelecting()) {
-      const start = dragStart()
-      if (start) {
-        setSelectionBox({ x1: start.x, x2: x })
-      }
-    } else if (isDragging()) {
-      const start = dragStart()
-      if (!start) return
-
-      const dx = x - start.x
-      const range = visibleTimeRange()
-      if (!range) return
-      const [rangeStart, rangeEnd] = range
-      const innerWidth = graphWidth - graphPadding.left - graphPadding.right
-      const timeShift = ((rangeEnd - rangeStart) * dx) / innerWidth
-
-      const dataRange = dataTimeRange()
-      if (!dataRange) return
-      const [dataStart, dataEnd] = dataRange
-
-      const newStart = rangeStart - timeShift
-      const newEnd = rangeEnd - timeShift
-
-      // Clamp to data boundaries
-      if (newStart >= dataStart && newEnd <= dataEnd) {
-        setZoomDomain([newStart, newEnd])
-        setDragStart({ x, timestamp: start.timestamp })
-      } else if (newStart < dataStart) {
-        const shift = dataStart - newStart
-        setZoomDomain([dataStart, newEnd + shift])
-        setDragStart({ x, timestamp: start.timestamp })
-      } else if (newEnd > dataEnd) {
-        const shift = newEnd - dataEnd
-        setZoomDomain([newStart - shift, dataEnd])
-        setDragStart({ x, timestamp: start.timestamp })
-      }
-    } else {
-      // Update hover crosshair
-      updateHoverPoint(x, y)
-    }
-  }
-
-  // Mouse up - complete drag or selection
-  const handleMouseUp = () => {
-    if (isSelecting()) {
-      const box = selectionBox()
-      if (box && Math.abs(box.x2 - box.x1) > 10) {
-        const range = visibleTimeRange()
-        if (range) {
-          const [start, end] = range
-          const innerWidth = graphWidth - graphPadding.left - graphPadding.right
-
-          const x1 = Math.min(box.x1, box.x2)
-          const x2 = Math.max(box.x1, box.x2)
-          const ratio1 = Math.max(0, (x1 - graphPadding.left) / innerWidth)
-          const ratio2 = Math.min(1, (x2 - graphPadding.left) / innerWidth)
-
-          setZoomDomain([
-            start + (end - start) * ratio1,
-            start + (end - start) * ratio2
-          ])
-        }
-      }
-    }
-
-    setIsSelecting(false)
-    setIsDragging(false)
-    setDragStart(null)
-    setSelectionBox(null)
-  }
-
-  // Update hover point to nearest data point
-  const updateHoverPoint = (mouseX: number, mouseY: number) => {
     const data = graphData()
     if (!data || !data.points.length) {
       setHoveredPoint(null)
       return
     }
 
-    // Find nearest point by X coordinate (timestamp)
+    // Find nearest point by X coordinate
     let nearest = data.points[0]
     let minDist = Math.abs(data.points[0].x - mouseX)
 
@@ -469,120 +325,19 @@ export default function SiteDetail() {
       }
     }
 
-    // Only show if mouse is reasonably close (within 30px)
-    if (minDist < 30) {
+    // Only show if mouse is reasonably close (within 50px)
+    if (minDist < 50) {
       setHoveredPoint({
         timestamp: nearest.timestamp,
         responseTime: nearest.check.responseTime!,
         x: nearest.x,
-        y: nearest.y
+        y: nearest.y,
+        mouseX,
+        mouseY
       })
     } else {
       setHoveredPoint(null)
     }
-  }
-
-  // Reset zoom to full data range
-  const resetZoom = () => {
-    setZoomDomain(null)
-  }
-
-  // Touch support for mobile
-  const [touches, setTouches] = createSignal<Touch[]>([])
-
-  const handleTouchStart = (e: TouchEvent) => {
-    e.preventDefault()
-    setTouches(Array.from(e.touches))
-
-    if (e.touches.length === 1) {
-      const touch = e.touches[0]
-      const rect = (e.currentTarget as SVGElement).getBoundingClientRect()
-      const x = touch.clientX - rect.left
-      const range = visibleTimeRange()
-      if (!range) return
-
-      const [start, end] = range
-      const innerWidth = graphWidth - graphPadding.left - graphPadding.right
-      const ratio = (x - graphPadding.left) / innerWidth
-      const timestamp = start + (end - start) * ratio
-
-      setIsDragging(true)
-      setDragStart({ x, timestamp })
-    }
-  }
-
-  const handleTouchMove = (e: TouchEvent) => {
-    e.preventDefault()
-    const currentTouches = Array.from(e.touches)
-    const rect = (e.currentTarget as SVGElement).getBoundingClientRect()
-
-    if (currentTouches.length === 2 && touches().length === 2) {
-      // Pinch zoom
-      const prevDist = Math.hypot(
-        touches()[1].clientX - touches()[0].clientX,
-        touches()[1].clientY - touches()[0].clientY
-      )
-      const currDist = Math.hypot(
-        currentTouches[1].clientX - currentTouches[0].clientX,
-        currentTouches[1].clientY - currentTouches[0].clientY
-      )
-
-      const zoomFactor = prevDist / currDist
-      const centerX = (currentTouches[0].clientX + currentTouches[1].clientX) / 2 - rect.left
-
-      const range = visibleTimeRange()
-      if (!range) return
-      const [start, end] = range
-      const duration = end - start
-      const innerWidth = graphWidth - graphPadding.left - graphPadding.right
-      const ratio = (centerX - graphPadding.left) / innerWidth
-      const centerTs = start + duration * ratio
-
-      const newDuration = duration * zoomFactor
-      const dataRange = dataTimeRange()
-      if (!dataRange) return
-      const [dataStart, dataEnd] = dataRange
-
-      const newStart = Math.max(dataStart, centerTs - newDuration * ratio)
-      const newEnd = Math.min(dataEnd, centerTs + newDuration * (1 - ratio))
-
-      if (newEnd - newStart > 60000) {
-        setZoomDomain([newStart, newEnd])
-      }
-    } else if (currentTouches.length === 1 && isDragging()) {
-      // Single touch pan
-      const touch = currentTouches[0]
-      const x = touch.clientX - rect.left
-      const start = dragStart()
-      if (!start) return
-
-      const dx = x - start.x
-      const range = visibleTimeRange()
-      if (!range) return
-      const [rangeStart, rangeEnd] = range
-      const innerWidth = graphWidth - graphPadding.left - graphPadding.right
-      const timeShift = ((rangeEnd - rangeStart) * dx) / innerWidth
-
-      const dataRange = dataTimeRange()
-      if (!dataRange) return
-      const [dataStart, dataEnd] = dataRange
-
-      const newStart = rangeStart - timeShift
-      const newEnd = rangeEnd - timeShift
-
-      if (newStart >= dataStart && newEnd <= dataEnd) {
-        setZoomDomain([newStart, newEnd])
-        setDragStart({ x, timestamp: start.timestamp })
-      }
-    }
-
-    setTouches(currentTouches)
-  }
-
-  const handleTouchEnd = () => {
-    setIsDragging(false)
-    setDragStart(null)
-    setTouches([])
   }
 
   const handleBack = () => {
@@ -749,20 +504,6 @@ export default function SiteDetail() {
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <h2 class="text-lg font-medium text-[var(--text)]">Response Time History</h2>
               <div class="flex items-center gap-2 flex-wrap">
-                {/* Reset zoom button */}
-                <Show when={zoomDomain()}>
-                  <button
-                    onClick={resetZoom}
-                    class="px-3 py-1.5 text-xs rounded-lg border border-[var(--border)] text-[var(--text)] hover:bg-[var(--bg-hover)] flex items-center gap-1"
-                  >
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Reset
-                  </button>
-                </Show>
-
-                {/* Time scale buttons */}
                 <For each={[
                   { value: '4h', label: '4H' },
                   { value: '8h', label: '8H' },
@@ -794,22 +535,9 @@ export default function SiteDetail() {
                   <svg
                     viewBox={`0 0 ${graphWidth} ${graphHeight}`}
                     class="w-full max-w-full"
-                    style={{
-                      "min-width": "400px",
-                      cursor: isDragging() ? 'grabbing' : isSelecting() ? 'crosshair' : 'grab',
-                      "touch-action": "none"
-                    }}
-                    onWheel={handleWheel}
-                    onMouseDown={handleMouseDown}
+                    style={{ "min-width": "400px" }}
                     onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={() => {
-                      setHoveredPoint(null)
-                      handleMouseUp()
-                    }}
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
+                    onMouseLeave={() => setHoveredPoint(null)}
                   >
                     {/* Horizontal grid lines (Y-axis) */}
                     <For each={[0, 0.25, 0.5, 0.75, 1]}>
@@ -898,22 +626,6 @@ export default function SiteDetail() {
                       )}
                     </For>
 
-                    {/* Selection box */}
-                    <Show when={selectionBox()}>
-                      {(box) => (
-                        <rect
-                          x={Math.min(box().x1, box().x2)}
-                          y={graphPadding.top}
-                          width={Math.abs(box().x2 - box().x1)}
-                          height={data().innerHeight}
-                          fill="var(--accent)"
-                          opacity="0.2"
-                          stroke="var(--accent)"
-                          stroke-width="1"
-                        />
-                      )}
-                    </Show>
-
                     {/* Hover crosshair and tooltip */}
                     <Show when={hoveredPoint()}>
                       {(point) => (
@@ -937,12 +649,12 @@ export default function SiteDetail() {
                             stroke-width="2"
                           />
                           <foreignObject
-                            x={point().x < graphWidth / 2 ? point().x + 10 : point().x - 160}
-                            y={Math.max(20, point().y - 35)}
+                            x={point().mouseX + 15}
+                            y={point().mouseY - 40}
                             width="150"
                             height="50"
                           >
-                            <div class="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg p-2 shadow-lg text-xs">
+                            <div class="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg p-2 shadow-lg text-xs pointer-events-none">
                               <div class="font-mono font-semibold text-[var(--text)]">
                                 {formatResponseTime(point().responseTime)}
                               </div>
@@ -963,10 +675,6 @@ export default function SiteDetail() {
                       </linearGradient>
                     </defs>
                   </svg>
-                  <div class="mt-2 text-xs text-[var(--text-tertiary)] text-center">
-                    <span class="hidden sm:inline">Scroll to zoom • Drag to pan • Shift+Drag to select area</span>
-                    <span class="sm:hidden">Pinch to zoom • Drag to pan</span>
-                  </div>
                 </div>
               )}
             </Show>
