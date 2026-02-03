@@ -33,7 +33,14 @@ export default function SiteDetail() {
   const itemsPerPage = 25
 
   // Hover state
-  const [hoveredPoint, setHoveredPoint] = createSignal<{ timestamp: number; responseTime: number; x: number; y: number; mouseX: number; mouseY: number } | null>(null)
+  const [hoveredPoint, setHoveredPoint] = createSignal<{ timestamp: number; responseTime: number | null; x: number; y: number; mouseX: number; mouseY: number; isTimeout?: boolean } | null>(null)
+
+  // Helper to identify timeout checks
+  const isTimeoutCheck = (check: Check) => {
+    if (check.status !== 'down') return false
+    const errorMsg = check.errorMessage?.toLowerCase() || ''
+    return errorMsg.includes('abort') || errorMsg.includes('timeout') || errorMsg.includes('timed out')
+  }
 
   // Calculate how many checks to fetch based on time scale (with small buffer)
   const getChecksLimit = (scale: string) => {
@@ -229,38 +236,51 @@ export default function SiteDetail() {
       '1m': 43200,
     }
     const maxChecks = scaleToChecks[timeScale()] || 240
-    const data = checks().filter(c => c.responseTime !== null).slice(0, maxChecks).reverse()
-    if (data.length === 0) return null
+    // Include all checks with response time (including timeouts which have elapsed time)
+    const allData = checks().filter(c => c.responseTime !== null).slice(0, maxChecks).reverse()
+    if (allData.length === 0) return null
 
-    const times = data.map(c => c.responseTime!)
-    const maxTime = Math.max(...times, 1000) * 1.1
+    // Separate normal checks from timeout checks for response time calculation
+    const normalChecks = allData.filter(c => !isTimeoutCheck(c))
+    const times = normalChecks.map(c => c.responseTime!)
+    const maxTime = times.length > 0 ? Math.max(...times, 1000) * 1.1 : 1000
     const minTime = 0
 
     const innerWidth = graphWidth - graphPadding.left - graphPadding.right
     const innerHeight = graphHeight - graphPadding.top - graphPadding.bottom
 
-    // Calculate time range for intelligent labels
-    const timestamps = data.map(c => new Date(c.checkedAt).getTime())
+    // Calculate time range for intelligent labels (use all data for time range)
+    const timestamps = allData.map(c => new Date(c.checkedAt).getTime())
     const startTs = Math.min(...timestamps)
     const endTs = Math.max(...timestamps)
     const { ticks, interval } = calculateTimeIntervals(startTs, endTs)
 
-    // Map points using timestamp-based X positioning
-    const points = data.map((check) => {
+    // Map all points using timestamp-based X positioning
+    const allPoints = allData.map((check) => {
       const ts = new Date(check.checkedAt).getTime()
       const x = graphPadding.left + ((ts - startTs) / (endTs - startTs)) * innerWidth
-      const y = graphPadding.top + innerHeight - ((check.responseTime! - minTime) / (maxTime - minTime)) * innerHeight
-      return { x, y, check, timestamp: ts }
+      const isTimeout = isTimeoutCheck(check)
+      // For timeout checks, don't calculate Y position based on response time
+      const y = isTimeout
+        ? graphPadding.top + innerHeight // Place at bottom
+        : graphPadding.top + innerHeight - ((check.responseTime! - minTime) / (maxTime - minTime)) * innerHeight
+      return { x, y, check, timestamp: ts, isTimeout }
     })
 
-    // Create path for area
+    // Filter to only normal (non-timeout) points for line drawing
+    const points = allPoints.filter(p => !p.isTimeout)
+
+    // Get timeout points for markers
+    const timeoutPoints = allPoints.filter(p => p.isTimeout)
+
+    // Create path for area (only for normal points)
     const areaPath = points.length > 0 ? (
       `M ${points[0].x} ${graphPadding.top + innerHeight} ` +
       points.map(p => `L ${p.x} ${p.y}`).join(' ') +
       ` L ${points[points.length - 1].x} ${graphPadding.top + innerHeight} Z`
     ) : ''
 
-    // Create colored line segments
+    // Create colored line segments (only between consecutive non-timeout points)
     const lineSegments = points.slice(0, -1).map((point, i) => {
       const nextPoint = points[i + 1]
       const avgResponseTime = (point.check.responseTime! + nextPoint.check.responseTime!) / 2
@@ -298,7 +318,7 @@ export default function SiteDetail() {
       }
     }
 
-    return { points, areaPath, lineSegments, maxTime, innerHeight, innerWidth, majorGridLines, minorGridLines, data }
+    return { points, timeoutPoints, allPoints, areaPath, lineSegments, maxTime, innerHeight, innerWidth, majorGridLines, minorGridLines, data: allData }
   }
 
   // Simple hover handler
@@ -317,16 +337,16 @@ export default function SiteDetail() {
     const mouseY = svgPoint.y
 
     const data = graphData()
-    if (!data || !data.points.length) {
+    if (!data || !data.allPoints.length) {
       setHoveredPoint(null)
       return
     }
 
-    // Find nearest point by X coordinate
-    let nearest = data.points[0]
-    let minDist = Math.abs(data.points[0].x - mouseX)
+    // Find nearest point by X coordinate (check all points including timeouts)
+    let nearest = data.allPoints[0]
+    let minDist = Math.abs(data.allPoints[0].x - mouseX)
 
-    for (const point of data.points) {
+    for (const point of data.allPoints) {
       const dist = Math.abs(point.x - mouseX)
       if (dist < minDist) {
         minDist = dist
@@ -338,11 +358,12 @@ export default function SiteDetail() {
     if (minDist < 50) {
       setHoveredPoint({
         timestamp: nearest.timestamp,
-        responseTime: nearest.check.responseTime!,
+        responseTime: nearest.isTimeout ? null : nearest.check.responseTime!,
         x: nearest.x,
-        y: nearest.y,
+        y: nearest.isTimeout ? graphPadding.top + data.innerHeight - 10 : nearest.y,
         mouseX,
-        mouseY
+        mouseY,
+        isTimeout: nearest.isTimeout
       })
     } else {
       setHoveredPoint(null)
@@ -635,6 +656,30 @@ export default function SiteDetail() {
                       )}
                     </For>
 
+                    {/* Timeout markers */}
+                    <For each={data().timeoutPoints}>
+                      {(point) => (
+                        <g>
+                          {/* Vertical line from top to bottom */}
+                          <line
+                            x1={point.x}
+                            y1={graphPadding.top}
+                            x2={point.x}
+                            y2={graphPadding.top + data().innerHeight}
+                            stroke="rgb(239, 68, 68)"
+                            stroke-width="1"
+                            stroke-dasharray="3,3"
+                            opacity="0.6"
+                          />
+                          {/* X marker at bottom */}
+                          <g transform={`translate(${point.x}, ${graphPadding.top + data().innerHeight - 10})`}>
+                            <line x1="-4" y1="-4" x2="4" y2="4" stroke="rgb(239, 68, 68)" stroke-width="2" />
+                            <line x1="4" y1="-4" x2="-4" y2="4" stroke="rgb(239, 68, 68)" stroke-width="2" />
+                          </g>
+                        </g>
+                      )}
+                    </For>
+
                     {/* Hover crosshair and tooltip */}
                     <Show when={hoveredPoint()}>
                       {(point) => (
@@ -644,28 +689,40 @@ export default function SiteDetail() {
                             y1={graphPadding.top}
                             x2={point().mouseX}
                             y2={graphPadding.top + data().innerHeight}
-                            stroke="var(--text)"
+                            stroke={point().isTimeout ? "rgb(239, 68, 68)" : "var(--text)"}
                             stroke-width="1"
                             stroke-dasharray="4,4"
                             opacity="0.5"
                           />
-                          <circle
-                            cx={point().x}
-                            cy={point().y}
-                            r="4"
-                            fill="var(--text)"
-                            stroke="var(--bg)"
-                            stroke-width="2"
-                          />
+                          <Show when={point().isTimeout} fallback={
+                            <circle
+                              cx={point().x}
+                              cy={point().y}
+                              r="4"
+                              fill="var(--text)"
+                              stroke="var(--bg)"
+                              stroke-width="2"
+                            />
+                          }>
+                            {/* X marker for timeout hover */}
+                            <g transform={`translate(${point().x}, ${point().y})`}>
+                              <line x1="-5" y1="-5" x2="5" y2="5" stroke="rgb(239, 68, 68)" stroke-width="2.5" />
+                              <line x1="5" y1="-5" x2="-5" y2="5" stroke="rgb(239, 68, 68)" stroke-width="2.5" />
+                            </g>
+                          </Show>
                           <foreignObject
                             x={point().mouseX + 15}
                             y={point().mouseY - 40}
                             width="150"
                             height="50"
                           >
-                            <div class="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg p-2 shadow-lg text-xs pointer-events-none">
-                              <div class="font-mono font-semibold text-[var(--text)]">
-                                {formatResponseTime(point().responseTime)}
+                            <div class={`border rounded-lg p-2 shadow-lg text-xs pointer-events-none ${
+                              point().isTimeout
+                                ? 'bg-red-500/10 border-red-500/30'
+                                : 'bg-[var(--bg-elevated)] border-[var(--border)]'
+                            }`}>
+                              <div class={`font-mono font-semibold ${point().isTimeout ? 'text-red-500' : 'text-[var(--text)]'}`}>
+                                {point().isTimeout ? 'Timeout' : formatResponseTime(point().responseTime)}
                               </div>
                               <div class="text-[var(--text-tertiary)] text-[10px]">
                                 {new Date(point().timestamp).toLocaleString()}
