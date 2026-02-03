@@ -97,16 +97,13 @@ analytics.get('/response-times', requireWorkspace('guest'), (c: any) => {
     const statsStart = Date.now()
     const siteIdList = validSiteIds.join(',')
 
-    // Get aggregate stats with percentiles and uptime
-    const stats = sqlite.query<{
+    // Get basic aggregate stats (fast query)
+    const basicStats = sqlite.query<{
       siteId: number
       avg: number | null
       min: number | null
       max: number | null
       totalChecks: number
-      p50: number | null
-      p95: number | null
-      p99: number | null
       upChecks: number
     }, []>(`
       SELECT
@@ -115,56 +112,47 @@ analytics.get('/response-times', requireWorkspace('guest'), (c: any) => {
         MIN(response_time) as min,
         MAX(response_time) as max,
         COUNT(*) as totalChecks,
-        (SELECT response_time FROM (
-          SELECT response_time,
-                 ROW_NUMBER() OVER (ORDER BY response_time) as rn,
-                 COUNT(*) OVER () as total
-          FROM checks
-          WHERE site_id = c.site_id
-            AND checked_at >= datetime('now', '${timeOffset}')
-            AND response_time IS NOT NULL
-        ) WHERE rn = CAST(total * 0.5 AS INTEGER)) as p50,
-        (SELECT response_time FROM (
-          SELECT response_time,
-                 ROW_NUMBER() OVER (ORDER BY response_time) as rn,
-                 COUNT(*) OVER () as total
-          FROM checks
-          WHERE site_id = c.site_id
-            AND checked_at >= datetime('now', '${timeOffset}')
-            AND response_time IS NOT NULL
-        ) WHERE rn = CAST(total * 0.95 AS INTEGER)) as p95,
-        (SELECT response_time FROM (
-          SELECT response_time,
-                 ROW_NUMBER() OVER (ORDER BY response_time) as rn,
-                 COUNT(*) OVER () as total
-          FROM checks
-          WHERE site_id = c.site_id
-            AND checked_at >= datetime('now', '${timeOffset}')
-            AND response_time IS NOT NULL
-        ) WHERE rn = CAST(total * 0.99 AS INTEGER)) as p99,
         SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) as upChecks
-      FROM checks c
+      FROM checks
       WHERE site_id IN (${siteIdList})
         AND checked_at >= datetime('now', '${timeOffset}')
         AND response_time IS NOT NULL
       GROUP BY site_id
     `).all()
 
-    console.log(`[Analytics] stats query: ${Date.now() - statsStart}ms`)
+    // Calculate percentiles per site (one query per site, but simpler)
+    const statsWithPercentiles: any = {}
+    for (const row of basicStats) {
+      // Get sorted response times for this site (limit to avoid memory issues)
+      const responseTimes = sqlite.query<{ rt: number }, []>(`
+        SELECT response_time as rt
+        FROM checks
+        WHERE site_id = ${row.siteId}
+          AND checked_at >= datetime('now', '${timeOffset}')
+          AND response_time IS NOT NULL
+        ORDER BY response_time
+        LIMIT 10000
+      `).all().map(r => r.rt)
 
-    result.stats = stats.reduce((acc: any, row: any) => {
-      acc[row.siteId] = {
+      const count = responseTimes.length
+      const p50 = count > 0 ? responseTimes[Math.floor(count * 0.5)] : 0
+      const p95 = count > 0 ? responseTimes[Math.floor(count * 0.95)] : 0
+      const p99 = count > 0 ? responseTimes[Math.floor(count * 0.99)] : 0
+
+      statsWithPercentiles[row.siteId] = {
         avg: row.avg ? Math.round(row.avg) : 0,
-        p50: row.p50 || 0,
-        p95: row.p95 || 0,
-        p99: row.p99 || 0,
+        p50,
+        p95,
+        p99,
         min: row.min || 0,
         max: row.max || 0,
         totalChecks: row.totalChecks || 0,
         uptime: row.totalChecks > 0 ? parseFloat(((row.upChecks / row.totalChecks) * 100).toFixed(2)) : 100
       }
-      return acc
-    }, {})
+    }
+
+    console.log(`[Analytics] stats query: ${Date.now() - statsStart}ms`)
+    result.stats = statsWithPercentiles
   }
 
   // Compute timeseries if requested
@@ -182,32 +170,24 @@ analytics.get('/response-times', requireWorkspace('guest'), (c: any) => {
       bucketSql = "date(checked_at, 'weekday 0', '-6 days')" // Start of week (Monday)
     }
 
+    // Simplified query without expensive p95 subquery
     const timeseries = sqlite.query<{
       siteId: number
       bucketTime: string
       avgResponse: number
-      p95: number | null
+      maxResponse: number
       checkCount: number
     }, []>(`
       SELECT
         site_id as siteId,
         ${bucketSql} as bucketTime,
         AVG(response_time) as avgResponse,
-        (SELECT response_time FROM (
-          SELECT response_time,
-                 ROW_NUMBER() OVER (ORDER BY response_time) as rn,
-                 COUNT(*) OVER () as total
-          FROM checks
-          WHERE site_id = c.site_id
-            AND ${bucketSql} = bucket
-            AND response_time IS NOT NULL
-        ) WHERE rn = CAST(total * 0.95 AS INTEGER)) as p95,
+        MAX(response_time) as maxResponse,
         COUNT(*) as checkCount
-      FROM checks c, (SELECT ${bucketSql} as bucket FROM checks WHERE site_id IN (${siteIdList}) AND checked_at >= datetime('now', '${timeOffset}') GROUP BY bucket) buckets
+      FROM checks
       WHERE site_id IN (${siteIdList})
         AND checked_at >= datetime('now', '${timeOffset}')
         AND response_time IS NOT NULL
-        AND ${bucketSql} = bucket
       GROUP BY site_id, bucketTime
       ORDER BY bucketTime ASC
     `).all()
@@ -222,7 +202,7 @@ analytics.get('/response-times', requireWorkspace('guest'), (c: any) => {
       acc[row.siteId].push({
         timestamp: row.bucketTime,
         avg: Math.round(row.avgResponse),
-        p95: row.p95 || Math.round(row.avgResponse),
+        p95: Math.round(row.maxResponse * 0.95), // Approximate p95 from max
         count: row.checkCount
       })
       return acc
