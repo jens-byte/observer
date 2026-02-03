@@ -8,7 +8,6 @@ import Dashboard from './components/Dashboard'
 import SiteDetail from './components/SiteDetail'
 import InviteAccept from './components/InviteAccept'
 import WorkspaceRedirect from './components/WorkspaceRedirect'
-import Analytics from './components/Analytics'
 
 function LoadingScreen() {
   return (
@@ -93,13 +92,6 @@ function ProtectedSiteDetail() {
   )
 }
 
-function ProtectedAnalytics() {
-  return (
-    <ProtectedRoute>
-      <Analytics />
-    </ProtectedRoute>
-  )
-}
 
 export default function App() {
   return (
@@ -114,7 +106,6 @@ export default function App() {
         <Route path="/login" component={ProtectedLogin} />
         <Route path="/invite/:token" component={InviteAccept} />
         <Route path="/" component={ProtectedDashboard} />
-        <Route path="/analytics" component={ProtectedAnalytics} />
         <Route path="/sites/:siteId" component={ProtectedSiteDetail} />
         <Route path="/:slug" component={WorkspaceRedirect} />
       </Router>

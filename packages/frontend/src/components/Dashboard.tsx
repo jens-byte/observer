@@ -304,14 +304,6 @@ export default function Dashboard() {
             </div>
             <WorkspaceSwitcher />
 
-            {/* Analytics link */}
-            <a
-              href="/analytics"
-              class="hidden sm:inline text-sm text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
-            >
-              Analytics
-            </a>
-
             {/* Viewing indicators - hidden on mobile */}
             <Show when={viewingUsers().length > 0}>
               <div class="hidden md:flex items-center gap-1">

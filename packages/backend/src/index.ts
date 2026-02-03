@@ -16,7 +16,6 @@ import workspaceRoutes, { inviteRoutes } from './routes/workspaces'
 import siteRoutes from './routes/sites'
 import settingsRoutes from './routes/settings'
 import sseRoutes from './routes/sse'
-import analyticsRoutes from './routes/analytics'
 
 const app = new Hono()
 
@@ -42,7 +41,6 @@ app.route('/api/invites', inviteRoutes)
 // Workspace-scoped routes
 app.route('/api/workspaces/:workspaceId/sites', siteRoutes)
 app.route('/api/workspaces/:workspaceId/settings', settingsRoutes)
-app.route('/api/workspaces/:workspaceId/analytics', analyticsRoutes)
 
 // SSE endpoint
 app.route('/api/sse', sseRoutes)

@@ -7,8 +7,6 @@ import type {
   WorkspaceWithRole,
   WorkspaceMember,
   WorkspaceInvite,
-  AnalyticsResponse,
-  AnalyticsTimeRange,
 } from '@observer/shared'
 
 const API_BASE = '/api'
@@ -167,23 +165,4 @@ export const settings = {
     fetchApi<{ success: boolean }>(`/workspaces/${workspaceId}/settings/test-slack-bot`, {
       method: 'POST',
     }),
-}
-
-// Analytics
-export const analytics = {
-  getResponseTimes: async (
-    workspaceId: number,
-    params: {
-      siteIds: number[]
-      timeRange: AnalyticsTimeRange
-      metrics?: string
-    }
-  ): Promise<AnalyticsResponse> => {
-    const searchParams = new URLSearchParams({
-      timeRange: params.timeRange,
-      siteIds: params.siteIds.join(','),
-      ...(params.metrics && { metrics: params.metrics })
-    })
-    return fetchApi(`/workspaces/${workspaceId}/analytics/response-times?${searchParams}`)
-  }
 }
