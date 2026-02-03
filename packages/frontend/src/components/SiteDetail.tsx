@@ -271,26 +271,50 @@ export default function SiteDetail() {
     // Get timeout points for markers
     const timeoutPoints = allPoints.filter(p => p.isTimeout)
 
-    // Create path for area (only for normal points)
-    const areaPath = points.length > 0 ? (
-      `M ${points[0].x} ${graphPadding.top + innerHeight} ` +
-      points.map(p => `L ${p.x} ${p.y}`).join(' ') +
-      ` L ${points[points.length - 1].x} ${graphPadding.top + innerHeight} Z`
-    ) : ''
-
-    // Create colored line segments (only between consecutive non-timeout points)
-    const lineSegments = points.slice(0, -1).map((point, i) => {
-      const nextPoint = points[i + 1]
-      const avgResponseTime = (point.check.responseTime! + nextPoint.check.responseTime!) / 2
-      return {
-        x1: point.x,
-        y1: point.y,
-        x2: nextPoint.x,
-        y2: nextPoint.y,
-        color: getColorForResponseTime(avgResponseTime),
-        responseTime: avgResponseTime
+    // Create line segments only between points that are adjacent in the original data
+    // (break the line where timeouts occur)
+    const lineSegments: Array<{x1: number; y1: number; x2: number; y2: number; color: string; responseTime: number}> = []
+    for (let i = 0; i < allPoints.length - 1; i++) {
+      const current = allPoints[i]
+      const next = allPoints[i + 1]
+      // Only draw segment if both points are not timeouts
+      if (!current.isTimeout && !next.isTimeout) {
+        const avgResponseTime = (current.check.responseTime! + next.check.responseTime!) / 2
+        lineSegments.push({
+          x1: current.x,
+          y1: current.y,
+          x2: next.x,
+          y2: next.y,
+          color: getColorForResponseTime(avgResponseTime),
+          responseTime: avgResponseTime
+        })
       }
-    })
+    }
+
+    // Create area paths for each continuous segment (break at timeouts)
+    const areaPaths: string[] = []
+    let currentSegment: typeof points = []
+    for (let i = 0; i < allPoints.length; i++) {
+      if (!allPoints[i].isTimeout) {
+        currentSegment.push(allPoints[i])
+      } else {
+        // Timeout encountered - close current segment if it has points
+        if (currentSegment.length > 0) {
+          const path = `M ${currentSegment[0].x} ${graphPadding.top + innerHeight} ` +
+            currentSegment.map(p => `L ${p.x} ${p.y}`).join(' ') +
+            ` L ${currentSegment[currentSegment.length - 1].x} ${graphPadding.top + innerHeight} Z`
+          areaPaths.push(path)
+          currentSegment = []
+        }
+      }
+    }
+    // Close final segment
+    if (currentSegment.length > 0) {
+      const path = `M ${currentSegment[0].x} ${graphPadding.top + innerHeight} ` +
+        currentSegment.map(p => `L ${p.x} ${p.y}`).join(' ') +
+        ` L ${currentSegment[currentSegment.length - 1].x} ${graphPadding.top + innerHeight} Z`
+      areaPaths.push(path)
+    }
 
     // Generate major grid lines at tick positions
     const majorGridLines = ticks.map(tick => ({
@@ -316,7 +340,7 @@ export default function SiteDetail() {
       }
     }
 
-    return { points, timeoutPoints, allPoints, areaPath, lineSegments, maxTime, innerHeight, innerWidth, majorGridLines, minorGridLines, data: allData }
+    return { points, timeoutPoints, allPoints, areaPaths, lineSegments, maxTime, innerHeight, innerWidth, majorGridLines, minorGridLines, data: allData }
   }
 
   // Simple hover handler
@@ -632,12 +656,16 @@ export default function SiteDetail() {
                       )}
                     </For>
 
-                    {/* Area fill */}
-                    <path
-                      d={data().areaPath}
-                      fill="url(#gradient)"
-                      opacity="0.3"
-                    />
+                    {/* Area fills (one per continuous segment) */}
+                    <For each={data().areaPaths}>
+                      {(areaPath) => (
+                        <path
+                          d={areaPath}
+                          fill="url(#gradient)"
+                          opacity="0.3"
+                        />
+                      )}
+                    </For>
 
                     {/* Color-coded line segments */}
                     <For each={data().lineSegments}>
