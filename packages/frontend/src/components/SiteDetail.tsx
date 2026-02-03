@@ -35,11 +35,9 @@ export default function SiteDetail() {
   // Hover state
   const [hoveredPoint, setHoveredPoint] = createSignal<{ timestamp: number; responseTime: number | null; x: number; y: number; mouseX: number; mouseY: number; isTimeout?: boolean } | null>(null)
 
-  // Helper to identify timeout checks
+  // Helper to identify timeout checks (response time > 60 seconds)
   const isTimeoutCheck = (check: Check) => {
-    if (check.status !== 'down') return false
-    const errorMsg = check.errorMessage?.toLowerCase() || ''
-    return errorMsg.includes('abort') || errorMsg.includes('timeout') || errorMsg.includes('timed out')
+    return check.responseTime !== null && check.responseTime > 60000
   }
 
   // Calculate how many checks to fetch based on time scale (with small buffer)
