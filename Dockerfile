@@ -27,12 +27,38 @@ FROM oven/bun:1 AS production
 
 WORKDIR /app
 
+# Install Playwright system dependencies for Chromium
+RUN apt-get update && apt-get install -y \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libdbus-1-3 \
+    libxkbcommon0 \
+    libatspi2.0-0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    fonts-liberation \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy everything from builder (including node_modules)
 COPY --from=builder /app/package.json /app/bun.lock ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/packages/backend ./packages/backend
 COPY --from=builder /app/packages/frontend/dist ./packages/backend/public
+
+# Install Playwright browsers
+RUN cd /app && bunx playwright install chromium
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data

@@ -1,5 +1,73 @@
-// Screenshot functionality has been disabled to avoid Playwright/Chromium dependency
-// Only the diagnoseProblem function remains for error analysis
+import { chromium, type Browser } from 'playwright'
+
+// Singleton browser instance for reuse
+let browserInstance: Browser | null = null
+let browserLaunchPromise: Promise<Browser> | null = null
+
+// Get or create browser instance
+async function getBrowser(): Promise<Browser> {
+  if (browserInstance && browserInstance.isConnected()) {
+    return browserInstance
+  }
+
+  // Prevent multiple simultaneous browser launches
+  if (browserLaunchPromise) {
+    return browserLaunchPromise
+  }
+
+  browserLaunchPromise = chromium.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  })
+
+  browserInstance = await browserLaunchPromise
+  browserLaunchPromise = null
+
+  return browserInstance
+}
+
+// Take a screenshot of a URL
+export async function takeScreenshot(url: string): Promise<Buffer | null> {
+  let context = null
+  let page = null
+
+  try {
+    const browser = await getBrowser()
+    context = await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    })
+
+    page = await context.newPage()
+
+    // Set a reasonable timeout
+    page.setDefaultTimeout(15000)
+
+    // Navigate to the URL
+    await page.goto(url, {
+      waitUntil: 'domcontentloaded',
+      timeout: 15000,
+    })
+
+    // Wait a bit for any JS to render
+    await page.waitForTimeout(1000)
+
+    // Take screenshot
+    const screenshot = await page.screenshot({
+      type: 'png',
+      fullPage: false,
+    })
+
+    console.log(`[Screenshot] Captured screenshot for ${url}`)
+    return Buffer.from(screenshot)
+  } catch (error) {
+    console.error(`[Screenshot] Failed to capture ${url}:`, (error as Error).message)
+    return null
+  } finally {
+    if (page) await page.close().catch(() => {})
+    if (context) await context.close().catch(() => {})
+  }
+}
 
 // Diagnose the problem based on error message and status code
 export function diagnoseProblem(errorMessage: string | null, statusCode: number | null): string {
@@ -77,4 +145,3 @@ export function diagnoseProblem(errorMessage: string | null, statusCode: number 
 
   return 'Unknown issue - Check server logs, verify the URL is correct, and ensure the server is running properly.'
 }
-
