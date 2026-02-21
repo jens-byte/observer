@@ -22,13 +22,17 @@ COPY packages/frontend ./packages/frontend
 WORKDIR /app/packages/frontend
 RUN bun run build
 
+# Production dependencies only
+WORKDIR /app
+RUN rm -rf node_modules && bun install --production
+
 # Production stage - use full bun image for native modules
 FROM oven/bun:1 AS production
 
 WORKDIR /app
 
 # Install Playwright system dependencies for Chromium
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libnss3 \
     libnspr4 \
     libatk1.0-0 \
@@ -50,15 +54,16 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy everything from builder (including node_modules)
+# Copy only what's needed for production
 COPY --from=builder /app/package.json /app/bun.lock ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/packages/backend ./packages/backend
 COPY --from=builder /app/packages/frontend/dist ./packages/backend/public
 
-# Install Playwright browsers
-RUN cd /app && bunx playwright install chromium
+# Install Playwright browsers and clean up cache
+RUN cd /app && bunx playwright install chromium \
+    && rm -rf /tmp/playwright* /root/.cache/ms-playwright/.links
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data

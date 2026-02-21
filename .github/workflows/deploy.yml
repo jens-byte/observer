@@ -32,6 +32,10 @@ jobs:
             docker rm observer sqlite-web 2>/dev/null || true
             docker compose down --remove-orphans || true
             fuser -k 3001/tcp 2>/dev/null || true
+
+            # Clean up old Docker images and build cache to free disk space
+            docker image prune -af
+            docker builder prune -af
             sleep 2
 
             docker compose up --build -d
