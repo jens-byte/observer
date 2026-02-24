@@ -50,6 +50,9 @@ async function fetchWithRetry(url: string, options: FetchOptions): Promise<Fetch
       clearTimeout(timeoutId)
       const responseTime = Date.now() - startTime
 
+      // Consume response body to release the connection
+      await response.arrayBuffer()
+
       return { success: true, response, responseTime }
     } catch (error) {
       lastError = error as Error
