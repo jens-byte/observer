@@ -40,8 +40,22 @@ jobs:
 
             docker compose up --build -d
 
-            # Wait and check container health
-            sleep 5
+            # Wait for the app to come back before declaring success
+            echo "Waiting for /health to respond..."
+            for i in $(seq 1 60); do
+              if curl -fsS http://localhost:3001/health >/dev/null 2>&1; then
+                echo "Healthy after ${i}s"
+                break
+              fi
+              if [ "$i" = "60" ]; then
+                echo "Health check did not pass within 60s"
+                docker compose ps
+                docker compose logs --tail 100
+                exit 1
+              fi
+              sleep 1
+            done
+
             docker compose ps
             docker compose logs --tail 50
 

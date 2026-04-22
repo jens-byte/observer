@@ -299,26 +299,28 @@ async function handleDownNotification(
       const downtime = Date.now() - confirmedDownTime
 
       if (downtime >= delayMs) {
-        // Diagnose the problem
         const diagnosis = diagnoseProblem(errorMessage, statusCode)
+        const shouldScreenshot = settings.screenshotsEnabled
 
-        // Take screenshot if enabled
-        let screenshot: Buffer | null = null
-        if (settings.screenshotsEnabled) {
-          screenshot = await takeScreenshot(site.url)
-        }
-
-        // Send notification with diagnosis and screenshot
-        sendNotification(site.workspaceId, {
-          siteName: site.name,
-          siteUrl: site.url,
-          status: 'down',
-          errorMessage: errorMessage || undefined,
-          statusCode: statusCode || undefined,
-          diagnosis,
-        }, screenshot || undefined).catch(console.error)
-
+        // Mark as notified synchronously so we don't re-trigger while the async flow runs
         db.update(schema.sites).set({ downNotified: true }).where(eq(schema.sites.id, site.id)).run()
+
+        // Screenshot + notification must not block the check cycle
+        void (async () => {
+          try {
+            const screenshot = shouldScreenshot ? await takeScreenshot(site.url) : null
+            await sendNotification(site.workspaceId, {
+              siteName: site.name,
+              siteUrl: site.url,
+              status: 'down',
+              errorMessage: errorMessage || undefined,
+              statusCode: statusCode || undefined,
+              diagnosis,
+            }, screenshot || undefined)
+          } catch (error) {
+            console.error('[Monitor] Down notification failed:', (error as Error).message)
+          }
+        })()
       }
     }
   } else if (status === 'up') {
@@ -369,13 +371,21 @@ export async function checkAllSites() {
     console.log(`[Scheduler] Checking ${sites.length} sites in batches of 10...`)
   }
 
+  // Cap each site so one hung check can't dominate the cycle
+  const PER_SITE_TIMEOUT_MS = 120_000
+
   // Process all sites in batches of 10 with 200ms delay between batches
   await processBatches(
     sites,
     10,
     async (site) => {
       try {
-        await checkSite(site.id)
+        await Promise.race([
+          checkSite(site.id),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Per-site check timeout')), PER_SITE_TIMEOUT_MS)
+          ),
+        ])
       } catch (error) {
         console.error(`Error checking site ${site.name}:`, (error as Error).message)
       }

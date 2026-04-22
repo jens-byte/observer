@@ -20,10 +20,12 @@ async function getBrowser(): Promise<Browser> {
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   })
 
-  browserInstance = await browserLaunchPromise
-  browserLaunchPromise = null
-
-  return browserInstance
+  try {
+    browserInstance = await browserLaunchPromise
+    return browserInstance
+  } finally {
+    browserLaunchPromise = null
+  }
 }
 
 // Take a screenshot of a URL

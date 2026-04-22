@@ -101,8 +101,12 @@ sse.get('/events/:workspaceId', async (c) => {
   // Create a unique connection ID
   const connectionId = `${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
+  // One-hour max lifetime forces clients to reconnect periodically so leaked
+  // server-side connections can't accumulate indefinitely.
+  const MAX_CONNECTION_MS = 60 * 60 * 1000
+  const abortSignal = c.req.raw.signal
+
   return streamSSE(c, async (stream) => {
-    // Create send function
     const send = (event: SseEvent) => {
       stream.writeSSE({
         data: JSON.stringify(event),
@@ -110,7 +114,6 @@ sse.get('/events/:workspaceId', async (c) => {
       })
     }
 
-    // Create connection info
     const connectionInfo: ConnectionInfo = {
       send,
       user: {
@@ -120,40 +123,38 @@ sse.get('/events/:workspaceId', async (c) => {
       },
     }
 
-    // Add connection to workspace
     if (!connections.has(workspaceId)) {
       connections.set(workspaceId, new Map())
     }
     connections.get(workspaceId)!.set(connectionId, connectionInfo)
 
-    // Send connected event
     send({ type: 'connected', workspaceId })
-
-    // Broadcast presence update to all users (including the new one)
     broadcastPresence(workspaceId)
 
-    // Keep connection alive with periodic heartbeats
     const heartbeatInterval = setInterval(() => {
-      try {
-        stream.writeSSE({ data: 'heartbeat', event: 'heartbeat' })
-      } catch {
-        clearInterval(heartbeatInterval)
-      }
+      stream.writeSSE({ data: 'heartbeat', event: 'heartbeat' }).catch(() => {})
     }, 30000)
 
-    // Wait for connection to close
     try {
-      while (true) {
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-        // Check if stream is still writable
-        if (stream.closed) break
-      }
-    } catch {
-      // Connection closed
+      // Exit on any of: client disconnect (abort), stream close, or max lifetime.
+      await new Promise<void>((resolve) => {
+        let poll: ReturnType<typeof setInterval> | null = null
+        let maxAge: ReturnType<typeof setTimeout> | null = null
+        const done = () => {
+          if (poll) clearInterval(poll)
+          if (maxAge) clearTimeout(maxAge)
+          resolve()
+        }
+        if (abortSignal.aborted || stream.closed) return done()
+        abortSignal.addEventListener('abort', done, { once: true })
+        poll = setInterval(() => {
+          if (stream.closed) done()
+        }, 1000)
+        maxAge = setTimeout(done, MAX_CONNECTION_MS)
+      })
     } finally {
       clearInterval(heartbeatInterval)
       connections.get(workspaceId)?.delete(connectionId)
-      // Broadcast updated presence after user disconnects
       broadcastPresence(workspaceId)
     }
   })
